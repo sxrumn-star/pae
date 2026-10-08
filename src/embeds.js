@@ -117,6 +117,36 @@ function boosterRewardsEmbed(config) {
   return embed;
 }
 
+function inviteRewardsEmbed(config) {
+  return new EmbedBuilder()
+    .setTitle('・LIFELONG INVITE EVENT')
+    .setColor('#FFD700')
+    .setDescription(
+      `*Our permanent invite event is officially LIVE!*\n\n` +
+      `**HOW IT WORKS**\n` +
+      `-# Invite your friends using your custom invite link.\n` +
+      `-# Invites are tracked automatically through **Invite Tracker**.\n` +
+      `-# Only **vouched members** count — no alt accounts.\n` +
+      `-# Rewards are **cumulative**, so keep inviting for bigger rewards.\n` +
+      `-# New rewards will be added regularly.\n\n` +
+      `**REWARDS**\n` +
+      `-# **5 Invites** → Grama **OR** Sweet Set\n` +
+      `-# **10 Invites** → Cerberus **OR** 2x Harvester\n` +
+      `-# **20 Invites** → Duggy Bros **OR** Alienbeam\n` +
+      `-# **40 Invites** → Dragon Cannelloni **OR** Crow **OR** Alien Set\n` +
+      `-# **80 Invites** → LA Supreme **OR** FR Frost Dragon **OR** Everset\n` +
+      `-# **160 Invites** → Griffin **OR** FR Shadow Dragon **OR** Trav Set\n` +
+      `-# **300 Invites** → Meowl **OR** Gingerscope **OR** FR Bat Dragon\n\n` +
+      `**IMPORTANT**\n` +
+      `-# Rewards can be claimed starting in **2 weeks** while we restock the prize inventory.\n` +
+      `-# This event is **permanent** and never ends.\n` +
+      `-# Only valid invites from real members will count.\n\n` +
+      `*Start inviting, stack your rewards, and help us grow!*`
+    )
+    .setFooter({ text: `${brand(config)} - Lifelong Invite Event` })
+    .setTimestamp();
+}
+
 function welcomeEmbed({ member, inviter, inviteCode, uses, config }) {
   const guild = member.guild;
   const inviterText = inviter ? `${inviter} (${inviter.tag})` : `Unknown / Vanity / Direct join`;
@@ -162,6 +192,7 @@ module.exports = {
   mmTosEmbed,
   mmPanelEmbed,
   boosterRewardsEmbed,
+  inviteRewardsEmbed,
   welcomeEmbed,
   ticketWelcomeEmbed,
 };

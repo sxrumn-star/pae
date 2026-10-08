@@ -1,5 +1,5 @@
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
-const { marketplaceRulesEmbed, mmTosEmbed, mmPanelEmbed, boosterRewardsEmbed } = require('./embeds');
+const { marketplaceRulesEmbed, mmTosEmbed, mmPanelEmbed, boosterRewardsEmbed, inviteRewardsEmbed } = require('./embeds');
 const { isConfigured } = require('./tickets');
 const { canManageTickets } = require('./interactions');
 const { getReputation, giveReputation } = require('./reputation');
@@ -122,6 +122,14 @@ async function handleSlash(interaction, config) {
     );
     await interaction.channel.send({ embeds: [embed], components: [row] });
     return interaction.reply({ content: '✅ Auto middleman panel posted in this channel.', ephemeral: true });
+  }
+  if (name === 'setup' && interaction.options.getSubcommand() === 'invites') {
+    await interaction.channel.send({
+      content: '@everyone',
+      embeds: [inviteRewardsEmbed(config)],
+      allowedMentions: { parse: ['everyone'] },
+    });
+    return interaction.reply({ content: '✅ Invite rewards panel posted in this channel.', ephemeral: true });
   }
   if (name === 'crypto-setup') {
     const asset = interaction.options.getString('asset').trim();

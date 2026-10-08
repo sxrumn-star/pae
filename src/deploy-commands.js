@@ -38,7 +38,10 @@ const commands = [
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
     .addSubcommand(subcommand => subcommand
       .setName('automm')
-      .setDescription('Post the automatic crypto middleman panel')),
+      .setDescription('Post the automatic crypto middleman panel'))
+    .addSubcommand(subcommand => subcommand
+      .setName('invites')
+      .setDescription('Post the lifelong invite rewards panel')),
   new SlashCommandBuilder()
     .setName('crypto-setup')
     .setDescription('Configure the crypto escrow payment details (admin)')
