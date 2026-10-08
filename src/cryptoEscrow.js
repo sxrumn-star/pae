@@ -71,6 +71,13 @@ function canManage(member, config) {
 function releaseMoneyButtons() {
   return new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('crypto_release_money').setLabel('Release Money').setStyle(ButtonStyle.Success).setEmoji('💸'),
+    new ButtonBuilder().setCustomId('crypto_request_funded_cancel').setLabel('Request Mutual Cancel').setStyle(ButtonStyle.Danger).setEmoji('🤝'),
+  );
+}
+
+function mutualCancelButtons() {
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('crypto_confirm_funded_cancel').setLabel('Confirm Cancellation').setStyle(ButtonStyle.Danger).setEmoji('✅'),
   );
 }
 
@@ -451,8 +458,8 @@ async function handleCryptoButton(interaction, config) {
     if (!isParticipant(session, interaction.user.id) && !canManage(interaction.member, config)) {
       return interaction.reply({ content: 'Only a trader or staff member can cancel this session.', ephemeral: true });
     }
-    if (['payment_detected', 'awaiting_staff_confirmation', 'confirmation_pending', 'funded', 'released'].includes(session.phase)) {
-      return interaction.reply({ content: 'This ticket cannot be cancelled or deleted after payment was submitted. Contact MM / Staff.', ephemeral: true });
+    if (['payment_detected', 'awaiting_staff_confirmation', 'confirmation_pending', 'funded', 'mutual_cancel_pending', 'awaiting_payout_address', 'confirming_payout_address', 'released'].includes(session.phase)) {
+      return interaction.reply({ content: 'This ticket cannot be cancelled normally after payment was submitted. After payment is confirmed, the buyer can use **Request Mutual Cancel**, and both traders must approve it.', ephemeral: true });
     }
     updateSession(interaction.channelId, { phase: 'cancelled', cancelledBy: interaction.user.id });
     await interaction.reply({ content: `❌ Session cancelled by ${interaction.user}. This ticket will be deleted in 5 seconds.` });
@@ -607,6 +614,64 @@ async function handleCryptoButton(interaction, config) {
         .setFooter({ text: 'The button records the release in Discord; it does not send a blockchain transaction.' })],
       components: [releaseMoneyButtons()],
     });
+  }
+
+  if (interaction.customId === 'crypto_request_funded_cancel') {
+    if (session.phase !== 'funded') {
+      return interaction.reply({ content: 'A mutual cancellation can only be requested after payment is confirmed and before payout starts.', ephemeral: true });
+    }
+    if (participantRole(session, interaction.user.id) !== 'buyer') {
+      return interaction.reply({ content: 'Only the buyer—the person who sent the payment—can request a cancellation after payment is confirmed.', ephemeral: true });
+    }
+    const buyerId = userForRole(session, 'buyer');
+    const sellerId = userForRole(session, 'seller');
+    updateSession(interaction.channelId, {
+      phase: 'mutual_cancel_pending',
+      cancelRequestedBy: interaction.user.id,
+      cancellationConfirmations: [interaction.user.id],
+    });
+    return interaction.reply({
+      content: `<@${buyerId}> <@${sellerId}>`,
+      embeds: [new EmbedBuilder()
+        .setTitle('🤝 Mutual Cancellation Requested')
+        .setColor('#FEE75C')
+        .setDescription(
+          `<@${buyerId}> requested to cancel this trade after payment confirmation.\n\n` +
+          `**Buyer:** ✅ Confirmed\n**Seller:** ⏳ Waiting\n\n` +
+          `The ticket will only be cancelled when both traders confirm.`
+        )
+        .setFooter({ text: 'Release Money is paused while this cancellation request is pending.' })],
+      components: [mutualCancelButtons()],
+    });
+  }
+
+  if (interaction.customId === 'crypto_confirm_funded_cancel') {
+    if (session.phase !== 'mutual_cancel_pending') {
+      return interaction.reply({ content: 'There is no mutual cancellation request waiting for approval.', ephemeral: true });
+    }
+    if (session.cancellationConfirmations?.includes(interaction.user.id)) {
+      return interaction.reply({ content: 'You already confirmed this cancellation.', ephemeral: true });
+    }
+    const next = updateSession(interaction.channelId, current => {
+      current.cancellationConfirmations ||= [];
+      current.cancellationConfirmations.push(interaction.user.id);
+      return current;
+    });
+    if (next.cancellationConfirmations.length < 2) {
+      return interaction.reply({ content: `✅ ${interaction.user} confirmed the cancellation (**1/2**). Waiting for the other trader.` });
+    }
+    updateSession(interaction.channelId, {
+      phase: 'cancelled',
+      cancelledByMutualAgreement: true,
+      cancelledAt: new Date().toISOString(),
+    });
+    await interaction.reply({
+      content: '❌ **Trade cancelled by mutual agreement.** Both traders confirmed. This ticket will be deleted in 10 seconds.',
+      components: [],
+    });
+    const closeTimer = setTimeout(() => interaction.channel.delete().catch(() => null), 10000);
+    closeTimer.unref?.();
+    return;
   }
 
   if (interaction.customId === 'crypto_release_money') {
