@@ -1,0 +1,29 @@
+{
+  "name": "icemm-bot",
+  "version": "1.0.0",
+  "description": "ICEMM Discord bot - Marketplace rules, welcomer with inviter tracking, MM TOS, MM tickets, booster rewards",
+  "main": "src/index.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "deploy-commands": "node src/deploy-commands.js",
+    "build-exe": "pkg . --targets node22-win-x64 --output dist/ICEMM-Bot.exe"
+  },
+  "bin": "src/index.js",
+  "pkg": {
+    "scripts": [
+      "src/**/*.js"
+    ]
+  },
+  "dependencies": {
+    "discord.js": "^14.22.1",
+    "dotenv": "^16.4.5"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "devDependencies": {
+    "@yao-pkg/pkg": "^6.23.0"
+  }
+}

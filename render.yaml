@@ -1,0 +1,11 @@
+{
+  "name": "icemm-bot",
+  "services": [
+    {
+      "name": "icemm-bot",
+      "env": {
+        "NODE_VERSION": "20"
+      }
+    }
+  ]
+}
