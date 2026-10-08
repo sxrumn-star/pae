@@ -384,7 +384,7 @@ async function preparePayment(channelId, config) {
   };
 }
 
-async function createCryptoTicket(guild, opener, counterparty, config) {
+async function createCryptoTicket(guild, opener, counterparty, tradeTerms, config) {
   const overwrites = [
     { id: guild.roles.everyone.id, deny: [PermissionFlagsBits.ViewChannel] },
     { id: opener.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory] },
@@ -411,6 +411,8 @@ async function createCryptoTicket(guild, opener, counterparty, config) {
     channelId: channel.id,
     openerId: opener.id,
     counterpartyId: counterparty.id,
+    buyerGives: tradeTerms.buyerGives,
+    sellerGives: tradeTerms.sellerGives,
     roles: {},
     confirmations: [],
     phase: 'selecting_roles',
@@ -427,6 +429,8 @@ async function createCryptoTicket(guild, opener, counterparty, config) {
     .addFields(
       { name: 'Trader One', value: `${opener}`, inline: true },
       { name: 'Trader Two', value: `${counterparty}`, inline: true },
+      { name: '🛒 Buyer gives', value: tradeTerms.buyerGives },
+      { name: '💼 Seller gives', value: tradeTerms.sellerGives },
       { name: 'Buyer', value: 'Sends Litecoin to the escrow wallet after the price is accepted.' },
       { name: 'Seller', value: 'Releases the item/service after staff confirms payment.' },
     )
@@ -447,6 +451,24 @@ async function handleCryptoButton(interaction, config) {
         .setRequired(true)
         .setMinLength(15)
         .setMaxLength(25),
+    ));
+    modal.addComponents(new ActionRowBuilder().addComponents(
+      new TextInputBuilder()
+        .setCustomId('buyerGives')
+        .setLabel('What does the buyer give?')
+        .setPlaceholder('Example: $50 worth of Litecoin')
+        .setStyle(TextInputStyle.Paragraph)
+        .setRequired(true)
+        .setMaxLength(500),
+    ));
+    modal.addComponents(new ActionRowBuilder().addComponents(
+      new TextInputBuilder()
+        .setCustomId('sellerGives')
+        .setLabel('What does the seller give?')
+        .setPlaceholder('Example: Account, item, or service')
+        .setStyle(TextInputStyle.Paragraph)
+        .setRequired(true)
+        .setMaxLength(500),
     ));
     return interaction.showModal(modal);
   }
@@ -493,6 +515,8 @@ async function handleCryptoButton(interaction, config) {
           .addFields(
             { name: '🛒 Buyer', value: `<@${buyerId}>`, inline: true },
             { name: '💼 Seller', value: `<@${sellerId}>`, inline: true },
+            { name: 'Buyer gives', value: next.buyerGives },
+            { name: 'Seller gives', value: next.sellerGives },
           )
           .setFooter({ text: 'If these roles are wrong, cancel and open a new ticket.' })],
         components: [agreementButtons()],
@@ -769,6 +793,8 @@ async function handleCryptoButton(interaction, config) {
 async function handleCryptoModal(interaction, config) {
   if (interaction.customId === 'crypto_start_modal') {
     const rawId = interaction.fields.getTextInputValue('counterparty').trim();
+    const buyerGives = interaction.fields.getTextInputValue('buyerGives').trim();
+    const sellerGives = interaction.fields.getTextInputValue('sellerGives').trim();
     const match = rawId.match(/^(?:<@!?)?(\d{15,25})>?$/);
     if (!match) return interaction.reply({ content: 'Enter a valid Discord user ID.', ephemeral: true });
     const counterpartyMember = await interaction.guild.members.fetch(match[1]).catch(() => null);
@@ -777,7 +803,7 @@ async function handleCryptoModal(interaction, config) {
     if (counterparty.id === interaction.user.id) return interaction.reply({ content: 'Enter the other trader’s ID, not your own.', ephemeral: true });
     if (counterparty.bot) return interaction.reply({ content: 'A bot cannot be the other trader.', ephemeral: true });
     await interaction.deferReply({ ephemeral: true });
-    const channel = await createCryptoTicket(interaction.guild, interaction.user, counterparty, config);
+    const channel = await createCryptoTicket(interaction.guild, interaction.user, counterparty, { buyerGives, sellerGives }, config);
     return interaction.editReply({ content: `Crypto middleman ticket created: ${channel}` });
   }
 
