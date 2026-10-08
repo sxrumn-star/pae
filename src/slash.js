@@ -66,10 +66,6 @@ async function handleSlash(interaction, config) {
     if (rating) desc += `\n\nRating: ${'⭐'.repeat(rating)} (${rating}/5)`;
     embed.setDescription(desc);
     await interaction.reply({ embeds: [embed] });
-    if (isConfigured(config.channels.vouchLogChannelId)) {
-      const log = await interaction.guild.channels.fetch(config.channels.vouchLogChannelId).catch(() => null);
-      if (log && log.isTextBased()) await log.send({ embeds: [embed] });
-    }
     return;
   }
   if (name === 'rep') {
@@ -100,10 +96,6 @@ async function handleSlash(interaction, config) {
     embed.setFooter({ text: summary.updated ? 'Your previous rep for this user was updated.' : 'Thanks for leaving a rep!' });
 
     await interaction.reply({ embeds: [embed] });
-    if (isConfigured(config.channels.vouchLogChannelId)) {
-      const log = await interaction.guild.channels.fetch(config.channels.vouchLogChannelId).catch(() => null);
-      if (log && log.isTextBased() && log.id !== interaction.channelId) await log.send({ embeds: [embed] });
-    }
     return;
   }
   if (name === 'reps') {

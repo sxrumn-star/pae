@@ -1,4 +1,4 @@
-const { ChannelType, PermissionFlagsBits, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { ChannelType, PermissionFlagsBits, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { ticketWelcomeEmbed } = require('./embeds');
 
 function isConfigured(id) {
@@ -34,12 +34,6 @@ async function createMmTicket(guild, openerUser, details, config) {
     embeds: [ticketWelcomeEmbed({ opener: `${openerUser}`, details, config })],
     components: [row],
   });
-  if (isConfigured(config.channels.mmTicketLogChannelId)) {
-    const log = await guild.channels.fetch(config.channels.mmTicketLogChannelId).catch(() => null);
-    if (log && log.isTextBased()) {
-      await log.send({ embeds: [new EmbedBuilder().setTitle('MM ticket opened').setColor('#5865F2').setDescription(`${openerUser} opened ${channel}\nTrader2: ${details.trader2}\nTrade: ${details.trade}`).setTimestamp()] });
-    }
-  }
   return channel;
 }
 
