@@ -14,9 +14,10 @@ function wire(client, config) {
         const trader2 = interaction.fields.getTextInputValue('trader2');
         const trade = interaction.fields.getTextInputValue('trade');
         const agreed = interaction.fields.getTextInputValue('agreed');
+        const m = trader2.trim().match(/^(?:<@!?)?(\d{15,25})>?$/);
+        if (!m) return interaction.reply({ content: 'Enter a valid Discord user ID or mention for the second trader.', ephemeral: true });
         await interaction.deferReply({ ephemeral: true });
-        const m = trader2.match(/(\d{15,25})/);
-        const details = { trader1: `${interaction.user}`, trader2, trader2Id: m ? m[1] : null, trade, agreed };
+        const details = { trader1: `${interaction.user}`, trader2: `<@${m[1]}>`, trader2Id: m[1], trade, agreed };
         const channel = await createMmTicket(interaction.guild, interaction.user, details, config);
         return interaction.editReply({ content: `Ticket created: ${channel}.` });
       }

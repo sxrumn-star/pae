@@ -17,7 +17,7 @@ async function handleButtons(interaction, config) {
   if (interaction.customId === 'open_mm_ticket') {
     const modal = new ModalBuilder().setCustomId('mm_request_modal').setTitle('Request a Middleman');
     modal.addComponents(
-      new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('trader2').setLabel('Other trader name/mention/ID').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(200)),
+      new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('trader2').setLabel('Other trader user ID or mention').setPlaceholder('Example: 123456789012345678').setStyle(TextInputStyle.Short).setRequired(true).setMinLength(15).setMaxLength(25)),
       new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('trade').setLabel('What is being traded? both sides').setStyle(TextInputStyle.Paragraph).setRequired(true).setMaxLength(1000)),
       new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('agreed').setLabel('Both agreed? yes/no').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(20))
     );

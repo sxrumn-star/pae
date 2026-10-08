@@ -6,10 +6,22 @@ function isConfigured(id) {
 }
 
 async function createMmTicket(guild, openerUser, details, config) {
+  const trader2 = details.trader2Id
+    ? await guild.members.fetch(details.trader2Id).catch(() => null)
+    : null;
+  if (details.trader2Id && !trader2) {
+    throw new Error('The second trader ID is not a member of this server.');
+  }
+  if (trader2?.id === openerUser.id) {
+    throw new Error('The second trader must be a different user.');
+  }
   const overwrites = [
     { id: guild.roles.everyone.id, deny: [PermissionFlagsBits.ViewChannel] },
     { id: openerUser.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory] },
   ];
+  if (trader2) {
+    overwrites.push({ id: trader2.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory] });
+  }
   if (isConfigured(config.roles.mmRoleId)) {
     overwrites.push({ id: config.roles.mmRoleId, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory, PermissionFlagsBits.ManageMessages] });
   }
@@ -30,7 +42,7 @@ async function createMmTicket(guild, openerUser, details, config) {
   );
   const mmPing = isConfigured(config.roles.mmRoleId) ? `<@&${config.roles.mmRoleId}>` : '';
   await channel.send({
-    content: `${openerUser} ${mmPing}`,
+    content: `${openerUser} ${trader2 || ''} ${mmPing}`.trim(),
     embeds: [ticketWelcomeEmbed({ opener: `${openerUser}`, details, config })],
     components: [row],
   });
