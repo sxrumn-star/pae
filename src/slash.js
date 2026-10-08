@@ -24,10 +24,10 @@ async function handleSlash(interaction, config) {
     if (target.bot) return interaction.reply({ content: 'Choose a real member, not a bot.', ephemeral: true });
 
     const embed = new EmbedBuilder()
-      .setTitle('You Got Scammed! (Prank)')
-      .setColor('#FEE75C')
-      .setDescription(`${target}, you got “scammed” by trusting this suspicious message. Gotcha!\n\n**Nothing was taken—this is only a prank.** Do you want to join the prank crew?`)
-      .setFooter({ text: 'Harmless prank • No account, money, or items were taken' })
+      .setTitle('⚠️ Server Security Alert')
+      .setColor('#ED4245')
+      .setDescription(`${target}, you got scammed by a hit on this server.\n\nDo you want to join me?`)
+      .setFooter({ text: 'Choose an option — the prank is revealed after you answer' })
       .setTimestamp();
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId(`prank_join_yes:${target.id}`).setLabel('Yes').setStyle(ButtonStyle.Success),

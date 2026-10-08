@@ -26,11 +26,11 @@ async function handleButtons(interaction, config) {
       new ButtonBuilder().setCustomId(`prank_join_no:${targetId}`).setLabel('No').setStyle(ButtonStyle.Danger).setDisabled(true)
     );
     const result = new EmbedBuilder()
-      .setTitle('Gotcha — It Was a Prank!')
+      .setTitle('😂 Gotcha — It Was a Prank!')
       .setColor(answer === 'yes' ? '#57F287' : '#ED4245')
       .setDescription(answer === 'yes'
-        ? `<@${targetId}> clicked **Yes** 😂 Welcome to the prank crew!\n\nNothing was stolen or changed.`
-        : `<@${targetId}> clicked **No** 😅 Good choice!\n\nNothing was stolen or changed.`)
+        ? `<@${targetId}> clicked **Yes** 😂 Welcome to the prank crew!\n\nNothing was stolen, hacked, or changed.`
+        : `<@${targetId}> clicked **No** 😅 Good choice!\n\nNothing was stolen, hacked, or changed.`)
       .setTimestamp();
     return interaction.update({ content: `<@${targetId}>`, embeds: [result], components: [row], allowedMentions: { users: [targetId] } });
   }
