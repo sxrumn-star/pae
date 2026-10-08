@@ -1,4 +1,4 @@
-const { PermissionFlagsBits, EmbedBuilder, ActionRowBuilder } = require('discord.js');
+const { PermissionFlagsBits, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { marketplaceRulesEmbed, mmTosEmbed, mmPanelEmbed } = require('./embeds');
 const { createMmTicket, isConfigured } = require('./tickets');
 const { handleCryptoButton } = require('./cryptoEscrow');
@@ -13,6 +13,27 @@ function canManageTickets(member, config) {
 
 async function handleButtons(interaction, config) {
   const { ModalBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
+  if (interaction.customId.startsWith('prank_join_')) {
+    const match = interaction.customId.match(/^prank_join_(yes|no):(\d{15,25})$/);
+    if (!match) return interaction.reply({ content: 'This prank button is invalid.', ephemeral: true });
+    const [, answer, targetId] = match;
+    if (interaction.user.id !== targetId) {
+      return interaction.reply({ content: 'Only the mentioned member can answer this prank.', ephemeral: true });
+    }
+
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId(`prank_join_yes:${targetId}`).setLabel('Yes').setStyle(ButtonStyle.Success).setDisabled(true),
+      new ButtonBuilder().setCustomId(`prank_join_no:${targetId}`).setLabel('No').setStyle(ButtonStyle.Danger).setDisabled(true)
+    );
+    const result = new EmbedBuilder()
+      .setTitle('Gotcha — It Was a Prank!')
+      .setColor(answer === 'yes' ? '#57F287' : '#ED4245')
+      .setDescription(answer === 'yes'
+        ? `<@${targetId}> clicked **Yes** 😂 Welcome to the prank crew!\n\nNothing was stolen or changed.`
+        : `<@${targetId}> clicked **No** 😅 Good choice!\n\nNothing was stolen or changed.`)
+      .setTimestamp();
+    return interaction.update({ content: `<@${targetId}>`, embeds: [result], components: [row], allowedMentions: { users: [targetId] } });
+  }
   if (interaction.customId.startsWith('crypto_')) return handleCryptoButton(interaction, config);
   if (interaction.customId === 'open_mm_ticket') {
     const modal = new ModalBuilder().setCustomId('mm_request_modal').setTitle('Request a Middleman');

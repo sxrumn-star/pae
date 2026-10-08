@@ -33,6 +33,11 @@ const commands = [
     .setDescription('See how many reps someone has')
     .addUserOption(o => o.setName('user').setDescription('User to check (defaults to you)').setRequired(false)),
   new SlashCommandBuilder()
+    .setName('message')
+    .setDescription('Send a harmless prank message to a member (admin)')
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+    .addUserOption(o => o.setName('user').setDescription('Member who can answer the prank').setRequired(true)),
+  new SlashCommandBuilder()
     .setName('setup')
     .setDescription('Post a setup panel in this channel')
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)

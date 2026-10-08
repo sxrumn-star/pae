@@ -19,6 +19,22 @@ function reputationEmbed(user, summary, title = 'Reputation') {
 
 async function handleSlash(interaction, config) {
   const name = interaction.commandName;
+  if (name === 'message') {
+    const target = interaction.options.getUser('user');
+    if (target.bot) return interaction.reply({ content: 'Choose a real member, not a bot.', ephemeral: true });
+
+    const embed = new EmbedBuilder()
+      .setTitle('You Got Scammed! (Prank)')
+      .setColor('#FEE75C')
+      .setDescription(`${target}, you got “scammed” by trusting this suspicious message. Gotcha!\n\n**Nothing was taken—this is only a prank.** Do you want to join the prank crew?`)
+      .setFooter({ text: 'Harmless prank • No account, money, or items were taken' })
+      .setTimestamp();
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId(`prank_join_yes:${target.id}`).setLabel('Yes').setStyle(ButtonStyle.Success),
+      new ButtonBuilder().setCustomId(`prank_join_no:${target.id}`).setLabel('No').setStyle(ButtonStyle.Danger)
+    );
+    return interaction.reply({ content: `${target}`, embeds: [embed], components: [row], allowedMentions: { users: [target.id] } });
+  }
   if (name === 'setup-rules') {
     if (!isConfigured(config.channels.rulesChannelId)) return interaction.reply({ content: 'Set rulesChannelId first.', ephemeral: true });
     const ch = await interaction.guild.channels.fetch(config.channels.rulesChannelId);
