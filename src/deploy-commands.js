@@ -10,7 +10,7 @@ const commands = [
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
     .addSubcommand(subcommand => subcommand
       .setName('txid')
-      .setDescription('Post real Litecoin transaction IDs every 10–30 seconds')),
+      .setDescription('Post confirmed Litecoin transactions every 30 seconds–3 minutes')),
   new SlashCommandBuilder()
     .setName('stop')
     .setDescription('Stop an automated feed')

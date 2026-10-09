@@ -27,6 +27,7 @@ const {
   ticketWelcomeEmbed,
 } = require('./embeds');
 const { refreshInvites, refreshAllInvites, findUsedInvite } = require('./invites');
+const { isTxidFeedRunning, startTxidFeed } = require('./txidFeed');
 
 const config = loadConfig();
 
@@ -51,8 +52,24 @@ function canManageTickets(member) {
   return false;
 }
 
+async function ensurePersistentTxidFeed() {
+  const channelId = config.channels?.txidFeedChannelId;
+  if (!isConfigured(channelId)) return;
+  if (isTxidFeedRunning(channelId)) return;
+  const channel = await client.channels.fetch(channelId).catch(() => null);
+  if (!channel?.isTextBased()) {
+    console.error(`[txid feed] Configured channel ${channelId} could not be accessed; retrying later`);
+    return;
+  }
+  if (startTxidFeed(channel, client)) {
+    console.log(`[txid feed] Persistent feed enabled in #${channel.name} (${channelId})`);
+  }
+}
+
 client.once('ready', async () => {
   console.log(`Logged in as ${client.user.tag}`);
+  await ensurePersistentTxidFeed();
+  setInterval(ensurePersistentTxidFeed, 60_000).unref();
   try {
     await refreshAllInvites(client);
     console.log('Invite cache ready.');

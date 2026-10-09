@@ -35,7 +35,7 @@ async function handleSlash(interaction, config) {
     const started = startTxidFeed(interaction.channel, interaction.client);
     return interaction.reply({
       content: started
-        ? '✅ AutoMM deal feed started here. A confirmed escrow payment will be posted every 10–30 seconds.'
+        ? '✅ TXID feed started here. A confirmed Litecoin transaction will be posted every 30 seconds–3 minutes.'
         : 'The TXID feed is already running in this channel.',
       ephemeral: true,
     });

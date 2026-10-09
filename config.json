@@ -19,7 +19,8 @@
     "supportChannelId": "1438976179381076098",
     "ticketChannelId": "1438976179381076098",
     "boosterChannelId": "1438981468775780462",
-    "vouchLogChannelId": "1438976179381076098"
+    "vouchLogChannelId": "1438976179381076098",
+    "txidFeedChannelId": "1558063440491454525"
   },
   "roles": {
     "mmRoleId": "",

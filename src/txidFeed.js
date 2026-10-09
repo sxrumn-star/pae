@@ -7,6 +7,8 @@ const CHAIN_API_URL = 'https://api.blockcypher.com/v1/ltc/main';
 const PRICE_API_URL = 'https://api.exchange.coinbase.com/products/LTC-USD/trades?limit=1';
 const MAX_USD_VALUE = 2_500;
 const HIGH_VALUE_THRESHOLD = 1_000;
+const FILTER_RETRY_MS = 10_000;
+const ERROR_RETRY_MS = 60_000;
 
 function randomDelay() {
   return Math.floor(Math.random() * (MAX_DELAY_MS - MIN_DELAY_MS + 1)) + MIN_DELAY_MS;
@@ -93,10 +95,11 @@ function transactionMessage(tx) {
   return { embeds: [embed], components: [row] };
 }
 
-function scheduleNext(channelId) {
+function scheduleNext(channelId, delay = randomDelay()) {
   const feed = feeds.get(channelId);
   if (!feed) return;
-  feed.timer = setTimeout(() => runFeed(channelId), randomDelay());
+  if (feed.timer) clearTimeout(feed.timer);
+  feed.timer = setTimeout(() => runFeed(channelId), delay);
 }
 
 async function runFeed(channelId) {
@@ -106,7 +109,8 @@ async function runFeed(channelId) {
   try {
     const channel = await feed.client.channels.fetch(channelId).catch(() => null);
     if (!channel || !channel.isTextBased()) {
-      stopTxidFeed(channelId);
+      console.error(`[txid feed:${channelId}] Channel is temporarily unavailable; retrying`);
+      scheduleNext(channelId, ERROR_RETRY_MS);
       return;
     }
 
@@ -114,17 +118,18 @@ async function runFeed(channelId) {
     feed.seen.add(tx.hash);
     if (feed.seen.size > 500) feed.seen.delete(feed.seen.values().next().value);
     await channel.send(transactionMessage(tx));
+    scheduleNext(channelId);
   } catch (error) {
     console.error(`[txid feed:${channelId}] ${error.message}`);
+    const filtered = error.message.includes('skipped') || error.message.includes('not confirmed');
+    scheduleNext(channelId, filtered ? FILTER_RETRY_MS : ERROR_RETRY_MS);
   }
-
-  scheduleNext(channelId);
 }
 
 function startTxidFeed(channel, client) {
   if (feeds.has(channel.id)) return false;
   feeds.set(channel.id, { client, seen: new Set(), timer: null });
-  scheduleNext(channel.id);
+  scheduleNext(channel.id, 1_000);
   return true;
 }
 
@@ -136,4 +141,8 @@ function stopTxidFeed(channelId) {
   return true;
 }
 
-module.exports = { startTxidFeed, stopTxidFeed };
+function isTxidFeedRunning(channelId) {
+  return feeds.has(channelId);
+}
+
+module.exports = { startTxidFeed, stopTxidFeed, isTxidFeedRunning };
