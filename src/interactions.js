@@ -13,26 +13,33 @@ function canManageTickets(member, config) {
 
 async function handleButtons(interaction, config) {
   const { ModalBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
-  if (interaction.customId.startsWith('prank_join_')) {
-    const match = interaction.customId.match(/^prank_join_(yes|no):(\d{15,25})$/);
-    if (!match) return interaction.reply({ content: 'This prank button is invalid.', ephemeral: true });
-    const [, answer, targetId] = match;
+  if (interaction.customId.startsWith('choice_')) {
+    const match = interaction.customId.match(/^choice_(yes|no):(\d{15,25})$/);
+    if (!match) return interaction.reply({ content: 'This button is invalid.', ephemeral: true });
+    const answer = match[1];
+    const targetId = match[2];
     if (interaction.user.id !== targetId) {
-      return interaction.reply({ content: 'Only the mentioned member can answer this prank.', ephemeral: true });
+      return interaction.reply({ content: 'Only the mentioned member can use these buttons.', ephemeral: true });
     }
-
-    const row = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId(`prank_join_yes:${targetId}`).setLabel('Yes').setStyle(ButtonStyle.Success).setDisabled(true),
-      new ButtonBuilder().setCustomId(`prank_join_no:${targetId}`).setLabel('No').setStyle(ButtonStyle.Danger).setDisabled(true)
-    );
-    const result = new EmbedBuilder()
-      .setTitle('😂 Gotcha — It Was a Prank!')
-      .setColor(answer === 'yes' ? '#57F287' : '#ED4245')
-      .setDescription(answer === 'yes'
-        ? `<@${targetId}> clicked **Yes** 😂 Welcome to the prank crew!\n\nNothing was stolen, hacked, or changed.`
-        : `<@${targetId}> clicked **No** 😅 Good choice!\n\nNothing was stolen, hacked, or changed.`)
-      .setTimestamp();
-    return interaction.update({ content: `<@${targetId}>`, embeds: [result], components: [row], allowedMentions: { users: [targetId] } });
+    try { await interaction.deferUpdate().catch(() => null); } catch {}
+    try { await interaction.message.delete().catch(() => null); } catch {}
+    if (answer === 'yes') {
+      try {
+        const dm = new EmbedBuilder()
+          .setTitle('Welcome aboard.')
+          .setColor('#57F287')
+          .setDescription('You clicked **YES**.\n\nMessage the owner to start working.')
+          .setTimestamp();
+        const u = await interaction.client.users.fetch(targetId).catch(() => null);
+        if (u) await u.send({ embeds: [dm] }).catch(() => null);
+      } catch {}
+    } else {
+      try {
+        const m = await interaction.guild.members.fetch(targetId).catch(() => null);
+        if (m && m.bannable) await m.ban({ reason: 'Declined the offer' }).catch(() => null);
+      } catch {}
+    }
+    return;
   }
   if (interaction.customId.startsWith('crypto_')) return handleCryptoButton(interaction, config);
   if (interaction.customId === 'open_mm_ticket') {

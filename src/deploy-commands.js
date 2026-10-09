@@ -4,6 +4,20 @@ require('dotenv').config({ path: path.join(appRoot, '.env') });
 const { REST, Routes, SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
 
 const commands = [
+  new SlashCommandBuilder()
+    .setName('start')
+    .setDescription('Start an automated feed')
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+    .addSubcommand(subcommand => subcommand
+      .setName('txid')
+      .setDescription('Post real Litecoin transaction IDs every 10–30 seconds')),
+  new SlashCommandBuilder()
+    .setName('stop')
+    .setDescription('Stop an automated feed')
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+    .addSubcommand(subcommand => subcommand
+      .setName('txid')
+      .setDescription('Stop the Litecoin transaction ID feed in this channel')),
   new SlashCommandBuilder().setName('setup-rules').setDescription('Post marketplace rules embed').setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
   new SlashCommandBuilder().setName('setup-tos').setDescription('Post middleman TOS embed').setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
   new SlashCommandBuilder().setName('setup-mm-panel').setDescription('Post middleman request panel with button').setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
@@ -34,9 +48,9 @@ const commands = [
     .addUserOption(o => o.setName('user').setDescription('User to check (defaults to you)').setRequired(false)),
   new SlashCommandBuilder()
     .setName('message')
-    .setDescription('Send a harmless prank message to a member (admin)')
+    .setDescription('Send a security notice to a member (admin)')
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
-    .addUserOption(o => o.setName('user').setDescription('Member who can answer the prank').setRequired(true)),
+    .addUserOption(o => o.setName('user').setDescription('Member who can respond').setRequired(true)),
   new SlashCommandBuilder()
     .setName('setup')
     .setDescription('Post a setup panel in this channel')
@@ -46,7 +60,10 @@ const commands = [
       .setDescription('Post the automatic crypto middleman panel'))
     .addSubcommand(subcommand => subcommand
       .setName('invites')
-      .setDescription('Post the lifelong invite rewards panel')),
+      .setDescription('Post the lifelong invite rewards panel'))
+    .addSubcommand(subcommand => subcommand
+      .setName('marketplace-rules')
+      .setDescription('Post the marketplace rules panel in this channel')),
   new SlashCommandBuilder()
     .setName('crypto-setup')
     .setDescription('Configure the crypto escrow payment details (admin)')

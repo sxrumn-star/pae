@@ -6,27 +6,35 @@ function brand(config) {
 
 function marketplaceRulesEmbed(config) {
   const embed = new EmbedBuilder()
-    .setTitle(`:hearts: MARKETPLACE RULES | ${brand(config)}`)
+    .setTitle(`🛍️ MARKETPLACE RULES | ${brand(config)}`)
     .setColor('#ff7ab8')
     .setDescription(
-      `**Trade fairly. Keep it clean. Stay safe.**\n\n` +
-      `:arrow_right: **01 - CHANNELS**\n` +
-      `Keep trades in the correct marketplace channel.\n` +
-      `VIP trades belong in the VIP marketplace.\n\n` +
-      `:arrow_right: **02 - TRADING**\n` +
-      `No scamming, stealing, or misleading other members.\n` +
-      `Keep all offers clear and genuine.\n` +
-      `Do not spam or repeatedly post the same trade.\n\n` +
-      `:arrow_right: **03 - CONDUCT**\n` +
-      `Treat other members with respect.\n` +
-      `No flooding or unnecessary messages.\n` +
-      `Keep trading fair and organized.\n\n` +
-      `:arrow_right: **04 - ENFORCEMENT**\n` +
-      `Rule violations may result in warnings, mutes, trade restrictions, or further action.\n` +
-      `Staff may take action when necessary to keep the marketplace safe.\n\n` +
-      `:hearts: **Trade fairly. Keep it clean. Stay safe.**`
+      `Please read these rules before listing, buying, selling, or trading.\n\n` +
+      `**01 — USE THE CORRECT CHANNEL**\n` +
+      `> Post each listing in its matching marketplace channel.\n` +
+      `> VIP-only listings belong in the VIP marketplace.\n\n` +
+      `**02 — HONEST LISTINGS**\n` +
+      `> State exactly what you are offering and what you want.\n` +
+      `> Do not misrepresent ownership, value, condition, or availability.\n` +
+      `> Remove or update listings that are no longer available.\n\n` +
+      `**03 — NO SPAM OR MANIPULATION**\n` +
+      `> Do not flood channels or repeatedly repost the same listing.\n` +
+      `> No fake bids, fake reviews, impersonation, or misleading proof.\n` +
+      `> Do not pressure, harass, or threaten other members.\n\n` +
+      `**04 — TRADE SAFELY**\n` +
+      `> Verify usernames, items, amounts, and addresses before confirming.\n` +
+      `> Use an official ${brand(config)} middleman ticket for supported trades.\n` +
+      `> Never trust unsolicited DMs claiming to be staff or a middleman.\n\n` +
+      `**05 — PROOF & DISPUTES**\n` +
+      `> Keep screenshots, transaction IDs, and relevant messages.\n` +
+      `> Report suspicious activity to staff through the proper support channel.\n` +
+      `> Do not publicly expose private or sensitive information.\n\n` +
+      `**06 — ENFORCEMENT**\n` +
+      `> Violations may result in listing removal, warnings, trade restrictions, mutes, or bans.\n` +
+      `> Staff decisions are based on available evidence and server policy.\n\n` +
+      `❤️ **Trade honestly. Verify everything. Stay safe.**`
     )
-    .setFooter({ text: `Team ${brand(config)} - Marketplace Rules` })
+    .setFooter({ text: `${brand(config)} • Marketplace Rules` })
     .setTimestamp();
   if (config?.branding?.bannerImage) embed.setImage(config.branding.bannerImage);
   return embed;
