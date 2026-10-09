@@ -1,5 +1,13 @@
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
-const { marketplaceRulesEmbed, mmTosEmbed, mmPanelEmbed, boosterRewardsEmbed, inviteRewardsEmbed } = require('./embeds');
+const {
+  marketplaceRulesEmbed,
+  mmTosEmbed,
+  mmPanelEmbed,
+  boosterRewardsEmbed,
+  inviteRewardsEmbed,
+  supportPanelEmbed,
+  refundPolicyEmbed,
+} = require('./embeds');
 const { isConfigured } = require('./tickets');
 const { canManageTickets } = require('./interactions');
 const { getReputation, giveReputation } = require('./reputation');
@@ -191,6 +199,14 @@ async function handleSlash(interaction, config) {
   if (name === 'setup' && interaction.options.getSubcommand() === 'marketplace-rules') {
     await interaction.channel.send({ embeds: [marketplaceRulesEmbed(config)] });
     return interaction.reply({ content: '✅ Marketplace rules panel posted in this channel.', ephemeral: true });
+  }
+  if (name === 'setup' && interaction.options.getSubcommand() === 'support') {
+    await interaction.channel.send({ embeds: [supportPanelEmbed(config)] });
+    return interaction.reply({ content: '✅ Support panel posted in this channel.', ephemeral: true });
+  }
+  if (name === 'setup' && interaction.options.getSubcommand() === 'refund-policy') {
+    await interaction.channel.send({ embeds: [refundPolicyEmbed(config)] });
+    return interaction.reply({ content: '✅ Refund policy panel posted in this channel.', ephemeral: true });
   }
   if (name === 'crypto-setup') {
     const asset = interaction.options.getString('asset').trim();

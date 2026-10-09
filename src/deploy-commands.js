@@ -63,7 +63,13 @@ const commands = [
       .setDescription('Post the lifelong invite rewards panel'))
     .addSubcommand(subcommand => subcommand
       .setName('marketplace-rules')
-      .setDescription('Post the marketplace rules panel in this channel')),
+      .setDescription('Post the marketplace rules panel in this channel'))
+    .addSubcommand(subcommand => subcommand
+      .setName('support')
+      .setDescription('Post the support panel in this channel'))
+    .addSubcommand(subcommand => subcommand
+      .setName('refund-policy')
+      .setDescription('Post the refund policy panel in this channel')),
   new SlashCommandBuilder()
     .setName('crypto-setup')
     .setDescription('Configure the crypto escrow payment details (admin)')

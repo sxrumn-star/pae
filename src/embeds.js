@@ -155,6 +155,54 @@ function inviteRewardsEmbed(config) {
     .setTimestamp();
 }
 
+function supportPanelEmbed(config) {
+  return new EmbedBuilder()
+    .setTitle(`🎫 SUPPORT | ${brand(config)}`)
+    .setColor('#5865F2')
+    .setDescription(
+      `Need help? Our support team is here for account, marketplace, payment, and middleman questions.\n\n` +
+      `**BEFORE CONTACTING SUPPORT**\n` +
+      `> Gather screenshots, transaction IDs, usernames, and other relevant proof.\n` +
+      `> Explain the issue clearly and include what outcome you need.\n` +
+      `> Never share passwords, recovery codes, or private keys.\n\n` +
+      `**WHEN YOU CONTACT US**\n` +
+      `> Be patient and keep all information in one support ticket.\n` +
+      `> Do not ping or privately message multiple staff members.\n` +
+      `> False reports, spam, or abusive behavior may result in action.\n\n` +
+      `**SECURITY**\n` +
+      `> Staff will never ask for your password, seed phrase, or login code.\n` +
+      `> Verify staff roles before following any instructions.\n\n` +
+      `📩 **Use the designated support channel or ticket system to get help.**`
+    )
+    .setFooter({ text: `${brand(config)} • Support` })
+    .setTimestamp();
+}
+
+function refundPolicyEmbed(config) {
+  return new EmbedBuilder()
+    .setTitle(`💳 REFUND POLICY | ${brand(config)}`)
+    .setColor('#FEE75C')
+    .setDescription(
+      `Please read this policy before making a payment or completing a trade.\n\n` +
+      `**ELIGIBLE REFUND REQUESTS**\n` +
+      `> Duplicate payments or confirmed billing errors.\n` +
+      `> A paid service that was cancelled by staff before delivery began.\n` +
+      `> Other cases specifically approved by authorized staff after review.\n\n` +
+      `**NON-REFUNDABLE**\n` +
+      `> Completed trades or services that were delivered as agreed.\n` +
+      `> Payments sent to the wrong address, network, or person.\n` +
+      `> Losses from off-platform deals, impersonators, or ignored safety instructions.\n` +
+      `> Market-price changes, buyer's remorse, or disputes without sufficient proof.\n\n` +
+      `**HOW TO REQUEST A REVIEW**\n` +
+      `> Contact support as soon as possible.\n` +
+      `> Include the transaction ID, amount, date, participants, and all relevant evidence.\n` +
+      `> Refund decisions are made after staff review of the available evidence.\n\n` +
+      `⚠️ **Never send additional funds to someone claiming they are required to release a refund.**`
+    )
+    .setFooter({ text: `${brand(config)} • Refund Policy` })
+    .setTimestamp();
+}
+
 function welcomeEmbed({ member, inviter, inviteCode, uses, config }) {
   const guild = member.guild;
   const inviterText = inviter ? `${inviter} (${inviter.tag})` : `Unknown / Vanity / Direct join`;
@@ -201,6 +249,8 @@ module.exports = {
   mmPanelEmbed,
   boosterRewardsEmbed,
   inviteRewardsEmbed,
+  supportPanelEmbed,
+  refundPolicyEmbed,
   welcomeEmbed,
   ticketWelcomeEmbed,
 };
