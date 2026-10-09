@@ -39,22 +39,22 @@ async function fetchRandomTransaction(seen) {
   if (!txids.length) throw new Error('The latest confirmed block had no transaction IDs');
 
   const candidates = txids.filter(hash => !seen.has(hash));
-  const pool = [...(candidates.length ? candidates : txids)].sort(() => Math.random() - 0.5);
+  const pool = candidates.length ? candidates : txids;
+  const hash = pool[Math.floor(Math.random() * pool.length)];
+  const tx = await requestJson(`${CHAIN_API_URL}/txs/${hash}`);
+  const ltcValue = Number(tx.total || 0) / 100_000_000;
+  const usdValue = ltcValue * ltcUsd;
 
-  const eligible = [];
-  for (const hash of pool.slice(0, 20)) {
-    const tx = await requestJson(`${CHAIN_API_URL}/txs/${hash}`);
-    const ltcValue = Number(tx.total || 0) / 100_000_000;
-    const usdValue = ltcValue * ltcUsd;
-    if (tx?.hash && Number(tx.confirmations || 0) >= 1 && usdValue <= MAX_USD_VALUE) {
-      eligible.push({ ...tx, ltcUsd, usdValue });
-    }
+  if (!tx?.hash || Number(tx.confirmations || 0) < 1) {
+    throw new Error('The selected Litecoin transaction is not confirmed');
   }
-  if (eligible.length) {
-    const weighted = eligible.flatMap(tx => Array(tx.usdValue >= HIGH_VALUE_THRESHOLD ? 1 : 7).fill(tx));
-    return weighted[Math.floor(Math.random() * weighted.length)];
+  if (usdValue > MAX_USD_VALUE) {
+    throw new Error(`Transaction skipped because it is above $${MAX_USD_VALUE}`);
   }
-  throw new Error(`No confirmed transaction at or below $${MAX_USD_VALUE} was found`);
+  if (usdValue >= HIGH_VALUE_THRESHOLD && Math.random() > 0.10) {
+    throw new Error(`High-value transaction skipped by rarity filter`);
+  }
+  return { ...tx, ltcUsd, usdValue };
 }
 
 function transactionEmbed(tx) {
