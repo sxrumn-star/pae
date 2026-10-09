@@ -250,11 +250,43 @@ function incomingTransactions(payload) {
   return [...byHash.values()];
 }
 
-async function fetchLitecoinTransactions(address) {
+function incomingLitecoinSpaceTransactions(transactions, address) {
+  return transactions.map(transaction => ({
+    hash: transaction.txid,
+    value: Array.isArray(transaction.vout)
+      ? transaction.vout.reduce((sum, output) => sum + (output.scriptpubkey_address === address ? Number(output.value || 0) : 0), 0)
+      : 0,
+    confirmations: transaction.status?.confirmed ? 1 : 0,
+  })).filter(transaction => transaction.hash && transaction.value > 0);
+}
+
+async function fetchBlockCypherTransactions(address) {
   const url = `https://api.blockcypher.com/v1/ltc/main/addrs/${encodeURIComponent(address)}?limit=50`;
   const response = await fetch(url, { headers: { accept: 'application/json' }, signal: AbortSignal.timeout(15000) });
   if (!response.ok) throw new Error(`Litecoin API returned HTTP ${response.status}`);
   return incomingTransactions(await response.json());
+}
+
+async function fetchLitecoinSpaceTransactions(address) {
+  const baseUrl = `https://litecoinspace.org/api/address/${encodeURIComponent(address)}/txs`;
+  const [confirmedResponse, mempoolResponse] = await Promise.all([
+    fetch(`${baseUrl}/chain`, { headers: { accept: 'application/json' }, signal: AbortSignal.timeout(15000) }),
+    fetch(`${baseUrl}/mempool`, { headers: { accept: 'application/json' }, signal: AbortSignal.timeout(15000) }),
+  ]);
+  if (!confirmedResponse.ok || !mempoolResponse.ok) {
+    throw new Error(`Litecoin Space API returned HTTP ${confirmedResponse.ok ? mempoolResponse.status : confirmedResponse.status}`);
+  }
+  const transactions = [...await mempoolResponse.json(), ...await confirmedResponse.json()];
+  return incomingLitecoinSpaceTransactions(transactions, address);
+}
+
+async function fetchLitecoinTransactions(address) {
+  try {
+    return await fetchLitecoinSpaceTransactions(address);
+  } catch (primaryError) {
+    console.error(`[crypto watcher] Litecoin Space unavailable: ${primaryError.message}; trying fallback`);
+    return fetchBlockCypherTransactions(address);
+  }
 }
 
 async function startCryptoWatcher(client) {
