@@ -1,8 +1,8 @@
 const { EmbedBuilder } = require('discord.js');
 
 const feeds = new Map();
-const MIN_DELAY_MS = 60_000;
-const MAX_DELAY_MS = 240_000;
+const MIN_DELAY_MS = 30_000;
+const MAX_DELAY_MS = 180_000;
 const CHAIN_API_URL = 'https://api.blockcypher.com/v1/ltc/main';
 const PRICE_API_URL = 'https://api.exchange.coinbase.com/products/LTC-USD/trades?limit=1';
 const MAX_USD_VALUE = 2_500;
