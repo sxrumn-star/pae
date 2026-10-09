@@ -80,7 +80,7 @@ function transactionMessage(tx) {
       { name: 'Receiver', value: '`Anonymous`', inline: true },
       { name: 'Transaction', value: `\`${shorten(tx.hash)}\`` },
     )
-    .setFooter({ text: `Public Litecoin transaction • ${tx.confirmations} confirmation(s)` })
+    .setFooter({ text: `${tx.confirmations} confirmation(s)` })
     .setTimestamp(tx.received ? new Date(tx.received) : new Date());
 
   const row = new ActionRowBuilder().addComponents(
