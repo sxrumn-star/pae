@@ -63,11 +63,6 @@ function shorten(value, start = 6, end = 6) {
   return text.length > start + end + 3 ? `${text.slice(0, start)}...${text.slice(-end)}` : text;
 }
 
-function firstAddress(entries) {
-  const entry = Array.isArray(entries) ? entries.find(item => Array.isArray(item.addresses) && item.addresses[0]) : null;
-  return entry?.addresses?.[0] || null;
-}
-
 function transactionMessage(tx) {
   const total = Array.isArray(tx.outputs)
     ? tx.outputs.reduce((sum, output) => sum + Number(output.value || 0), 0)
@@ -81,8 +76,8 @@ function transactionMessage(tx) {
     .setColor('#3AB795')
     .addFields(
       { name: 'Amount', value: `\`${ltcAmount}\` LTC ($${usdAmount} USD)` },
-      { name: 'Sender', value: `\`${shorten(firstAddress(tx.inputs))}\``, inline: true },
-      { name: 'Receiver', value: `\`${shorten(firstAddress(tx.outputs))}\``, inline: true },
+      { name: 'Sender', value: '`Anonymous`', inline: true },
+      { name: 'Receiver', value: '`Anonymous`', inline: true },
       { name: 'Transaction', value: `\`${shorten(tx.hash)}\`` },
     )
     .setFooter({ text: `Public Litecoin transaction • ${tx.confirmations} confirmation(s)` })
