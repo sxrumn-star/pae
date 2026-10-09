@@ -1,4 +1,4 @@
-const { EmbedBuilder } = require('discord.js');
+const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
 
 const feeds = new Map();
 const MIN_DELAY_MS = 30_000;
@@ -57,23 +57,45 @@ async function fetchRandomTransaction(seen) {
   return { ...tx, ltcUsd, usdValue };
 }
 
-function transactionEmbed(tx) {
+function shorten(value, start = 6, end = 6) {
+  if (!value) return 'Unknown';
+  const text = String(value);
+  return text.length > start + end + 3 ? `${text.slice(0, start)}...${text.slice(-end)}` : text;
+}
+
+function firstAddress(entries) {
+  const entry = Array.isArray(entries) ? entries.find(item => Array.isArray(item.addresses) && item.addresses[0]) : null;
+  return entry?.addresses?.[0] || null;
+}
+
+function transactionMessage(tx) {
   const total = Array.isArray(tx.outputs)
     ? tx.outputs.reduce((sum, output) => sum + Number(output.value || 0), 0)
     : Number(tx.total || 0);
+  const ltcAmount = litoshisToLtc(total);
+  const usdAmount = tx.usdValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const explorerUrl = `https://live.blockcypher.com/ltc/tx/${tx.hash}/`;
 
-  return new EmbedBuilder()
-    .setTitle('Live Litecoin Transaction')
-    .setColor('#345D9D')
-    .setDescription(`A confirmed public Litecoin transaction highlighted by the AutoMM feed.\n\n**TXID**\n\`${tx.hash}\``)
+  const embed = new EmbedBuilder()
+    .setTitle('LTC Transaction Confirmed')
+    .setColor('#3AB795')
     .addFields(
-      { name: 'Amount moved', value: `${litoshisToLtc(total)} LTC`, inline: true },
-      { name: 'Estimated value', value: `$${tx.usdValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, inline: true },
-      { name: 'Status', value: `Confirmed • ${tx.confirmations} confirmation(s)`, inline: true },
-      { name: 'Explorer', value: `[View transaction](https://live.blockcypher.com/ltc/tx/${tx.hash}/)` },
+      { name: 'Amount', value: `\`${ltcAmount}\` LTC ($${usdAmount} USD)` },
+      { name: 'Sender', value: `\`${shorten(firstAddress(tx.inputs))}\``, inline: true },
+      { name: 'Receiver', value: `\`${shorten(firstAddress(tx.outputs))}\``, inline: true },
+      { name: 'Transaction', value: `\`${shorten(tx.hash)}\`` },
     )
-    .setFooter({ text: 'Public blockchain data • Not linked to a specific AutoMM trade' })
+    .setFooter({ text: `Public Litecoin transaction • ${tx.confirmations} confirmation(s)` })
     .setTimestamp(tx.received ? new Date(tx.received) : new Date());
+
+  const row = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setLabel('View Transaction')
+      .setStyle(ButtonStyle.Link)
+      .setURL(explorerUrl),
+  );
+
+  return { embeds: [embed], components: [row] };
 }
 
 function scheduleNext(channelId) {
@@ -96,7 +118,7 @@ async function runFeed(channelId) {
     const tx = await fetchRandomTransaction(feed.seen);
     feed.seen.add(tx.hash);
     if (feed.seen.size > 500) feed.seen.delete(feed.seen.values().next().value);
-    await channel.send({ embeds: [transactionEmbed(tx)] });
+    await channel.send(transactionMessage(tx));
   } catch (error) {
     console.error(`[txid feed:${channelId}] ${error.message}`);
   }
