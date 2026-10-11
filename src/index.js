@@ -32,13 +32,16 @@ const { cleanupExpiredReputation } = require('./reputation');
 
 const config = loadConfig();
 
+const gatewayIntents = [
+  GatewayIntentBits.Guilds,
+  GatewayIntentBits.GuildMessages,
+];
+if (/^(1|true|yes)$/i.test(process.env.ENABLE_GUILD_MEMBERS_INTENT || '')) {
+  gatewayIntents.push(GatewayIntentBits.GuildMembers);
+}
+
 const client = new Client({
-  intents: [
-    GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMembers,
-    GatewayIntentBits.GuildMessages,
-    
-  ],
+  intents: gatewayIntents,
   partials: [Partials.GuildMember, Partials.Channel],
 });
 
