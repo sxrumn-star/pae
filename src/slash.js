@@ -113,6 +113,38 @@ async function handleSlash(interaction, config) {
     if (!canManageTickets(interaction.member, config)) return interaction.reply({ content: 'Only MM / Staff.', ephemeral: true });
     return interaction.reply({ content: `${interaction.user} claimed this ticket.` });
   }
+  if (name === 'add') {
+    if (!canManageTickets(interaction.member, config)) {
+      return interaction.reply({ content: 'Only MM / Staff can add members to tickets.', ephemeral: true });
+    }
+    const channel = interaction.channel;
+    const isTicket = channel?.isTextBased()
+      && (channel.topic?.startsWith('MM ticket |')
+        || channel.topic?.startsWith('Crypto MM |')
+        || channel.parentId === config.channels?.mmTicketCategoryId);
+    if (!isTicket || !channel.permissionOverwrites) {
+      return interaction.reply({ content: 'Use this command inside an MM ticket.', ephemeral: true });
+    }
+
+    const user = interaction.options.getUser('user');
+    if (user.bot) {
+      return interaction.reply({ content: 'Choose a server member, not a bot.', ephemeral: true });
+    }
+    const member = await interaction.guild.members.fetch(user.id).catch(() => null);
+    if (!member) {
+      return interaction.reply({ content: 'That user is not a member of this server.', ephemeral: true });
+    }
+
+    await channel.permissionOverwrites.edit(member.id, {
+      ViewChannel: true,
+      SendMessages: true,
+      ReadMessageHistory: true,
+    });
+    return interaction.reply({
+      content: `✅ ${member} was added to this ticket by ${interaction.user}.`,
+      allowedMentions: { users: [member.id, interaction.user.id] },
+    });
+  }
   if (name === 'close') {
     if (!canManageTickets(interaction.member, config)) return interaction.reply({ content: 'Only MM / Staff.', ephemeral: true });
     const reason = interaction.options.getString('reason') || 'No reason';
