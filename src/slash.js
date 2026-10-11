@@ -14,6 +14,7 @@ const { deleteUserReputation, getReputation, giveReputation } = require('./reput
 const { saveConfig } = require('./config');
 const { deleteUserCryptoSessions, scheduleCryptoConfirmation } = require('./cryptoEscrow');
 const { startTxidFeed, stopTxidFeed } = require('./txidFeed');
+const { deleteUserRenameData, scheduleRenameJob } = require('./renameJobs');
 
 function reputationEmbed(user, summary, title = 'Reputation') {
   const average = summary.count ? summary.average.toFixed(2) : 'No ratings yet';
@@ -105,8 +106,9 @@ async function handleSlash(interaction, config) {
     }
     const reputationRecords = deleteUserReputation(interaction.user.id);
     const cryptoSessions = deleteUserCryptoSessions(interaction.user.id);
+    const renameJobs = deleteUserRenameData(interaction.user.id);
     return interaction.reply({
-      content: `✅ Your stored bot data was deleted (${reputationRecords} reputation record${reputationRecords === 1 ? '' : 's'} and ${cryptoSessions} payment session${cryptoSessions === 1 ? '' : 's'}). Discord messages already posted in channels are not removed.`,
+      content: `✅ Your stored bot data was deleted (${reputationRecords} reputation record${reputationRecords === 1 ? '' : 's'}, ${cryptoSessions} payment session${cryptoSessions === 1 ? '' : 's'}, and ${renameJobs} pending rename job${renameJobs === 1 ? '' : 's'}). Discord messages already posted in channels are not removed.`,
       ephemeral: true,
     });
   }
@@ -343,7 +345,14 @@ async function handleSlash(interaction, config) {
     const usedOnlineFilter = online.length >= Math.min(count, manageable.length);
     const candidates = shuffled(usedOnlineFilter ? online : manageable);
     if (!candidates.length) {
-      return interaction.editReply({ content: `No manageable users with the ${targetRole} role are available. Move my bot role above that role and its members.` });
+      scheduleRenameJob({
+        guildId: interaction.guildId,
+        channelId: interaction.channelId,
+        requestedById: interaction.user.id,
+        roleId: targetRole.id,
+        remaining: count,
+      });
+      return interaction.editReply({ content: `⏳ No manageable ${targetRole} users are visible yet. A pending job was created for **${count}** members and will continue as eligible **Member** users become available through server activity.` });
     }
 
     const selected = candidates.slice(0, Math.min(count, candidates.length));
@@ -364,11 +373,20 @@ async function handleSlash(interaction, config) {
 
     const details = renamed.join('\n');
     const visibleDetails = details.length > 1400 ? `${details.slice(0, 1397)}...` : details;
+    const remaining = Math.max(0, count - renamed.length);
+    scheduleRenameJob({
+      guildId: interaction.guildId,
+      channelId: interaction.channelId,
+      requestedById: interaction.user.id,
+      roleId: targetRole.id,
+      remaining,
+      processedIds: selected.map(member => member.id),
+    });
     return interaction.editReply({
       content:
         `✅ Renamed **${renamed.length}** random ${usedOnlineFilter ? 'online ' : ''}${targetRole} member${renamed.length === 1 ? '' : 's'} with realistic display names.` +
         (!usedOnlineFilter ? '\nPresence data was incomplete, so the command used manageable members found in the server cache and recent channel activity.' : '') +
-        (candidates.length < count ? `\nOnly **${candidates.length}** eligible members were available.` : '') +
+        (remaining ? `\n⏳ **${remaining}** remaining. The bot will keep the job active and rename additional eligible **Member** users as Discord exposes them through server activity.` : '') +
         (failed.length ? `\n**${failed.length}** rename${failed.length === 1 ? '' : 's'} failed.` : '') +
         (visibleDetails ? `\n\n${visibleDetails}` : ''),
       allowedMentions: { parse: [] },
