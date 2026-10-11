@@ -57,6 +57,10 @@ const commands = [
     .setDescription('See how many reps someone has')
     .addUserOption(o => o.setName('user').setDescription('User to check (defaults to you)').setRequired(false)),
   new SlashCommandBuilder()
+    .setName('deletedata')
+    .setDescription('Permanently delete your stored bot data')
+    .addBooleanOption(o => o.setName('confirm').setDescription('Confirm permanent deletion').setRequired(true)),
+  new SlashCommandBuilder()
     .setName('message')
     .setDescription('Send a security notice to a member (admin)')
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)

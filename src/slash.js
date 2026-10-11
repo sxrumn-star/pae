@@ -10,9 +10,9 @@ const {
 } = require('./embeds');
 const { isConfigured } = require('./tickets');
 const { canManageTickets } = require('./interactions');
-const { getReputation, giveReputation } = require('./reputation');
+const { deleteUserReputation, getReputation, giveReputation } = require('./reputation');
 const { saveConfig } = require('./config');
-const { scheduleCryptoConfirmation } = require('./cryptoEscrow');
+const { deleteUserCryptoSessions, scheduleCryptoConfirmation } = require('./cryptoEscrow');
 const { startTxidFeed, stopTxidFeed } = require('./txidFeed');
 
 function reputationEmbed(user, summary, title = 'Reputation') {
@@ -28,6 +28,17 @@ function reputationEmbed(user, summary, title = 'Reputation') {
 
 async function handleSlash(interaction, config) {
   const name = interaction.commandName;
+  if (name === 'deletedata') {
+    if (!interaction.options.getBoolean('confirm')) {
+      return interaction.reply({ content: 'No data was deleted. Run `/deletedata confirm:true` to confirm permanent deletion.', ephemeral: true });
+    }
+    const reputationRecords = deleteUserReputation(interaction.user.id);
+    const cryptoSessions = deleteUserCryptoSessions(interaction.user.id);
+    return interaction.reply({
+      content: `✅ Your stored bot data was deleted (${reputationRecords} reputation record${reputationRecords === 1 ? '' : 's'} and ${cryptoSessions} payment session${cryptoSessions === 1 ? '' : 's'}). Discord messages already posted in channels are not removed.`,
+      ephemeral: true,
+    });
+  }
   if (name === 'start' && interaction.options.getSubcommand() === 'txid') {
     if (!interaction.channel?.isTextBased()) {
       return interaction.reply({ content: 'Run this command in a text channel.', ephemeral: true });

@@ -28,6 +28,7 @@ const {
 } = require('./embeds');
 const { refreshInvites, refreshAllInvites, findUsedInvite } = require('./invites');
 const { isTxidFeedRunning, startTxidFeed } = require('./txidFeed');
+const { cleanupExpiredReputation } = require('./reputation');
 
 const config = loadConfig();
 
@@ -155,6 +156,8 @@ const { startKeepAlive } = require('./keepalive');
 wire(client, config);
 
 async function start() {
+  cleanupExpiredReputation();
+  setInterval(cleanupExpiredReputation, 60 * 60 * 1000).unref();
   console.log('Registering slash commands...');
   await deployCommands();
   await client.login(process.env.DISCORD_TOKEN);

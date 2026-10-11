@@ -1,5 +1,11 @@
 # ICEMM Discord Bot
 
+## Data protection
+
+Set `DATA_ENCRYPTION_KEY` in the hosting environment to a long, unique secret before starting the bot. The bot uses it to encrypt reputation and payment-session records with AES-256-GCM. Keep the key stable: changing or losing it makes existing encrypted records unreadable.
+
+Stored activity records are retained for no more than 30 days. Users can permanently remove their stored reputation and payment-session records with `/deletedata confirm:true`. See [PRIVACY.md](./PRIVACY.md) for the public privacy policy.
+
 Bot for marketplace server:
 1. Marketplace rules embed
 2. Welcomer with inviter tracking

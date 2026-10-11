@@ -1,6 +1,6 @@
-const fs = require('node:fs');
 const path = require('node:path');
 const { appRoot } = require('./runtime');
+const { readEncryptedJson, writeEncryptedJson } = require('./secureStore');
 
 const dataDir = path.join(appRoot, 'data');
 const dataPath = path.join(dataDir, 'reputation.json');
@@ -11,18 +11,61 @@ function emptyStore() {
 
 function loadStore() {
   try {
-    return JSON.parse(fs.readFileSync(dataPath, 'utf8'));
+    const store = readEncryptedJson(dataPath, emptyStore);
+    if (pruneExpiredRatings(store)) saveStore(store);
+    return store;
   } catch (error) {
-    if (error.code !== 'ENOENT') console.error('[reputation] Could not read data:', error);
-    return emptyStore();
+    if (error.code === 'ENOENT') return emptyStore();
+    throw new Error(`Could not decrypt reputation data: ${error.message}`, { cause: error });
   }
 }
 
 function saveStore(store) {
-  fs.mkdirSync(dataDir, { recursive: true });
-  const temporaryPath = `${dataPath}.tmp`;
-  fs.writeFileSync(temporaryPath, JSON.stringify(store, null, 2), 'utf8');
-  fs.renameSync(temporaryPath, dataPath);
+  writeEncryptedJson(dataPath, store);
+}
+
+const RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
+
+function pruneExpiredRatings(store, now = Date.now()) {
+  let changed = false;
+  for (const [guildId, users] of Object.entries(store.guilds || {})) {
+    for (const [recipientId, ratings] of Object.entries(users || {})) {
+      for (const [giverId, rating] of Object.entries(ratings || {})) {
+        const timestamp = Date.parse(rating.updatedAt || '');
+        if (!timestamp || now - timestamp >= RETENTION_MS) {
+          delete ratings[giverId];
+          changed = true;
+        }
+      }
+      if (!Object.keys(ratings).length) delete users[recipientId];
+    }
+    if (!Object.keys(users).length) delete store.guilds[guildId];
+  }
+  return changed;
+}
+
+function deleteUserReputation(userId) {
+  const store = loadStore();
+  let deleted = 0;
+  for (const users of Object.values(store.guilds || {})) {
+    if (users[userId]) {
+      deleted += Object.keys(users[userId]).length;
+      delete users[userId];
+    }
+    for (const ratings of Object.values(users)) {
+      if (ratings[userId]) {
+        delete ratings[userId];
+        deleted += 1;
+      }
+    }
+  }
+  saveStore(store);
+  return deleted;
+}
+
+function cleanupExpiredReputation() {
+  const store = loadStore();
+  return Object.keys(store.guilds || {}).length;
 }
 
 function getUserRatings(store, guildId, userId) {
@@ -61,4 +104,4 @@ function giveReputation({ guildId, recipientId, giverId, stars, message }) {
   return { updated, ...summarizeRatings(ratings) };
 }
 
-module.exports = { dataPath, getReputation, giveReputation, summarizeRatings };
+module.exports = { cleanupExpiredReputation, dataPath, deleteUserReputation, getReputation, giveReputation, summarizeRatings };

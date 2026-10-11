@@ -1,4 +1,3 @@
-const fs = require('node:fs');
 const path = require('node:path');
 const { randomInt } = require('node:crypto');
 const {
@@ -14,6 +13,7 @@ const {
 } = require('discord.js');
 const { appRoot } = require('./runtime');
 const { isConfigured } = require('./tickets');
+const { readEncryptedJson, writeEncryptedJson } = require('./secureStore');
 
 const dataDir = path.join(appRoot, 'data');
 const dataPath = path.join(dataDir, 'crypto-sessions.json');
@@ -21,18 +21,51 @@ const pendingConfirmationTimers = new Map();
 
 function readSessions() {
   try {
-    return JSON.parse(fs.readFileSync(dataPath, 'utf8'));
+    const sessions = readEncryptedJson(dataPath, () => ({}));
+    if (pruneExpiredSessions(sessions)) writeSessions(sessions);
+    return sessions;
   } catch (error) {
-    if (error.code !== 'ENOENT') console.error('[crypto] Could not read sessions:', error);
-    return {};
+    if (error.code === 'ENOENT') return {};
+    throw new Error(`Could not decrypt crypto session data: ${error.message}`, { cause: error });
   }
 }
 
 function writeSessions(sessions) {
-  fs.mkdirSync(dataDir, { recursive: true });
-  const temporaryPath = `${dataPath}.tmp`;
-  fs.writeFileSync(temporaryPath, JSON.stringify(sessions, null, 2), 'utf8');
-  fs.renameSync(temporaryPath, dataPath);
+  writeEncryptedJson(dataPath, sessions);
+}
+
+const RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
+
+function pruneExpiredSessions(sessions, now = Date.now()) {
+  let changed = false;
+  for (const [channelId, session] of Object.entries(sessions)) {
+    const timestamp = Date.parse(session.updatedAt || session.createdAt || '');
+    if (!timestamp || now - timestamp >= RETENTION_MS) {
+      delete sessions[channelId];
+      changed = true;
+    }
+  }
+  return changed;
+}
+
+function deleteUserCryptoSessions(userId) {
+  const sessions = readSessions();
+  let deleted = 0;
+  for (const [channelId, session] of Object.entries(sessions)) {
+    const userIds = new Set([
+      session.openerId,
+      session.counterpartyId,
+      session.receivedBy,
+      session.confirmationRequestedBy,
+      ...Object.keys(session.roles || {}),
+    ].filter(Boolean));
+    if (userIds.has(userId)) {
+      delete sessions[channelId];
+      deleted += 1;
+    }
+  }
+  writeSessions(sessions);
+  return deleted;
 }
 
 function getSession(channelId) {
@@ -959,4 +992,4 @@ async function handleCryptoModal(interaction, config) {
 
 }
 
-module.exports = { confirmCryptoPayment, createCryptoTicket, fetchLitecoinTransactions, getSession, handleCryptoButton, handleCryptoModal, incomingTransactions, isValidLitecoinAddress, resumePendingConfirmations, scheduleCryptoConfirmation, startCryptoWatcher };
+module.exports = { confirmCryptoPayment, createCryptoTicket, deleteUserCryptoSessions, fetchLitecoinTransactions, getSession, handleCryptoButton, handleCryptoModal, incomingTransactions, isValidLitecoinAddress, resumePendingConfirmations, scheduleCryptoConfirmation, startCryptoWatcher };
