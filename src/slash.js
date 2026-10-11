@@ -44,6 +44,46 @@ function shuffled(values) {
   return copy;
 }
 
+async function collectRecentlyActiveMembers(guild, members, targetRoleId, wanted) {
+  const channels = await guild.channels.fetch().catch(() => null);
+  if (!channels) return 0;
+  const readable = shuffled([...channels.values()].filter(channel =>
+    channel?.isTextBased() && channel.messages?.fetch
+  )).slice(0, 25);
+  let found = 0;
+  let individualFetches = 0;
+  const attemptedIds = new Set(members.keys());
+  for (const channel of readable) {
+    try {
+      const messages = await channel.messages.fetch({ limit: 50 });
+      for (const message of messages.values()) {
+        const authorId = message.author?.id;
+        if (!authorId || message.author.bot || attemptedIds.has(authorId)) continue;
+        attemptedIds.add(authorId);
+
+        let member = message.member;
+        if (!member && individualFetches < 75) {
+          individualFetches += 1;
+          member = await guild.members.fetch(authorId).catch(() => null);
+        }
+        if (!member || member.user.bot) continue;
+        members.set(member.id, member);
+        if (member.roles.cache.has(targetRoleId)) found += 1;
+      }
+      const eligibleFound = [...members.values()].filter(member =>
+        !member.user.bot &&
+        member.id !== guild.ownerId &&
+        member.roles.cache.has(targetRoleId) &&
+        member.manageable
+      ).length;
+      if (eligibleFound >= wanted) break;
+    } catch {
+      // Skip channels where the bot cannot read message history.
+    }
+  }
+  return found;
+}
+
 async function handleSlash(interaction, config) {
   const name = interaction.commandName;
   if (name === 'deletedata') {
@@ -256,6 +296,7 @@ async function handleSlash(interaction, config) {
       return interaction.editReply({ content: 'I could not find a role named **Member**. The role name must match exactly (capitalization does not matter).' });
     }
     const members = new Map(interaction.guild.members.cache.map(member => [member.id, member]));
+    let fullListAvailable = true;
     try {
       let after;
       do {
@@ -265,7 +306,18 @@ async function handleSlash(interaction, config) {
         after = page.lastKey();
       } while (after);
     } catch (error) {
+      fullListAvailable = false;
       console.warn(`[rename] Full member list unavailable; using cached members: ${error.message}`);
+    }
+
+    const cachedEligibleCount = [...members.values()].filter(member =>
+      !member.user.bot &&
+      member.id !== interaction.guild.ownerId &&
+      member.roles.cache.has(targetRole.id) &&
+      member.manageable
+    ).length;
+    if (!fullListAvailable && cachedEligibleCount < count) {
+      await collectRecentlyActiveMembers(interaction.guild, members, targetRole.id, count);
     }
 
     const manageable = [...members.values()].filter(member =>
@@ -302,7 +354,7 @@ async function handleSlash(interaction, config) {
     return interaction.editReply({
       content:
         `✅ Renamed **${renamed.length}** random ${usedOnlineFilter ? 'online ' : ''}${targetRole} member${renamed.length === 1 ? '' : 's'} with realistic display names.` +
-        (!usedOnlineFilter ? '\nPresence data was unavailable, so the command used manageable members from the available member list.' : '') +
+        (!usedOnlineFilter ? '\nPresence data was incomplete, so the command used manageable members found in the server cache and recent channel activity.' : '') +
         (candidates.length < count ? `\nOnly **${candidates.length}** eligible members were available.` : '') +
         (failed.length ? `\n**${failed.length}** rename${failed.length === 1 ? '' : 's'} failed.` : '') +
         (visibleDetails ? `\n\n${visibleDetails}` : ''),
