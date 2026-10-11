@@ -49,26 +49,39 @@ async function collectRecentlyActiveMembers(guild, members, targetRoleId, wanted
   if (!channels) return 0;
   const readable = shuffled([...channels.values()].filter(channel =>
     channel?.isTextBased() && channel.messages?.fetch
-  )).slice(0, 25);
+  )).slice(0, 100);
   let found = 0;
   let individualFetches = 0;
+  const individualFetchLimit = Math.min(1000, Math.max(100, wanted * 2));
   const attemptedIds = new Set(members.keys());
   for (const channel of readable) {
     try {
-      const messages = await channel.messages.fetch({ limit: 50 });
-      for (const message of messages.values()) {
-        const authorId = message.author?.id;
-        if (!authorId || message.author.bot || attemptedIds.has(authorId)) continue;
-        attemptedIds.add(authorId);
+      let before;
+      for (let pageNumber = 0; pageNumber < 5; pageNumber += 1) {
+        const messages = await channel.messages.fetch({ limit: 100, before });
+        if (!messages.size) break;
+        for (const message of messages.values()) {
+          const authorId = message.author?.id;
+          if (!authorId || message.author.bot || attemptedIds.has(authorId)) continue;
+          attemptedIds.add(authorId);
 
-        let member = message.member;
-        if (!member && individualFetches < 75) {
-          individualFetches += 1;
-          member = await guild.members.fetch(authorId).catch(() => null);
+          let member = message.member;
+          if (!member && individualFetches < individualFetchLimit) {
+            individualFetches += 1;
+            member = await guild.members.fetch(authorId).catch(() => null);
+          }
+          if (!member || member.user.bot) continue;
+          members.set(member.id, member);
+          if (member.roles.cache.has(targetRoleId)) found += 1;
         }
-        if (!member || member.user.bot) continue;
-        members.set(member.id, member);
-        if (member.roles.cache.has(targetRoleId)) found += 1;
+        const eligibleFound = [...members.values()].filter(member =>
+          !member.user.bot &&
+          member.id !== guild.ownerId &&
+          member.roles.cache.has(targetRoleId) &&
+          member.manageable
+        ).length;
+        if (eligibleFound >= wanted || messages.size < 100) break;
+        before = messages.lastKey();
       }
       const eligibleFound = [...members.values()].filter(member =>
         !member.user.bot &&

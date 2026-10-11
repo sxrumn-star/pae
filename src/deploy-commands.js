@@ -44,7 +44,7 @@ const commands = [
     .setName('rename')
     .setDescription('Give random members realistic display names (admin)')
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
-    .addIntegerOption(o => o.setName('count').setDescription('Number of members to rename').setMinValue(1).setMaxValue(50).setRequired(true)),
+    .addIntegerOption(o => o.setName('count').setDescription('Number of members to rename').setMinValue(1).setMaxValue(1000).setRequired(true)),
   new SlashCommandBuilder()
     .setName('vouch')
     .setDescription('Leave feedback for a trade')
