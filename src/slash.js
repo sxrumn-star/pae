@@ -251,9 +251,9 @@ async function handleSlash(interaction, config) {
 
     await interaction.deferReply({ ephemeral: true });
     const count = interaction.options.getInteger('count');
-    const targetRole = interaction.guild.roles.cache.find(role => role.name.toLowerCase() === 'members');
+    const targetRole = interaction.guild.roles.cache.find(role => role.name.toLowerCase() === 'member');
     if (!targetRole) {
-      return interaction.editReply({ content: 'I could not find a role named **Members**. The role name must match exactly (capitalization does not matter).' });
+      return interaction.editReply({ content: 'I could not find a role named **Member**. The role name must match exactly (capitalization does not matter).' });
     }
     const members = new Map(interaction.guild.members.cache.map(member => [member.id, member]));
     try {
