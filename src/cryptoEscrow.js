@@ -441,15 +441,10 @@ async function preparePayment(channelId, config) {
   if (!isConfigured(crypto.asset) || !isConfigured(crypto.network) || !addresses.length) {
     throw new Error('No real escrow wallet is configured. Ask an admin to add a verified receiving address.');
   }
-  const allSessions = Object.values(readSessions());
-  const reservedAddresses = new Set(allSessions
-    .filter(item => item.channelId !== channelId && item.phase === 'awaiting_payment')
-    .map(item => item.depositAddress));
-  const availableAddresses = addresses.filter(address => !reservedAddresses.has(address));
-  if (!availableAddresses.length) {
-    throw new Error('All escrow addresses are assigned to another pending payment. Finish that ticket or add another real address.');
-  }
-  const depositAddress = availableAddresses[randomInt(availableAddresses.length)];
+  // Every ticket intentionally uses the same configured escrow wallet.
+  // Transaction baselines still prevent an older transfer from being treated
+  // as a new payment when a ticket begins watching the shared address.
+  const depositAddress = addresses[0];
   const baseline = await fetchLitecoinTransactions(depositAddress);
   const next = updateSession(channelId, {
     phase: 'awaiting_payment',
