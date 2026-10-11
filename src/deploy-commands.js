@@ -31,6 +31,10 @@ const commands = [
     .setName('claim')
     .setDescription('Claim this MM ticket (MM/Staff only)'),
   new SlashCommandBuilder()
+    .setName('add')
+    .setDescription('Add a member to this ticket (MM/Staff only)')
+    .addUserOption(o => o.setName('id').setDescription('Member to add to this ticket').setRequired(true)),
+  new SlashCommandBuilder()
     .setName('vouch')
     .setDescription('Leave feedback for a trade')
     .addUserOption(o => o.setName('user').setDescription('Who are you vouching? (usually the MM)').setRequired(true))
