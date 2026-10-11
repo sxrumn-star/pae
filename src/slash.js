@@ -26,6 +26,24 @@ function reputationEmbed(user, summary, title = 'Reputation') {
     .setTimestamp();
 }
 
+const realisticNames = [
+  'Adam', 'Alex', 'Amelia', 'Ava', 'Benjamin', 'Blake', 'Caleb', 'Cameron', 'Charlotte', 'Chloe',
+  'Daniel', 'David', 'Dylan', 'Eleanor', 'Elijah', 'Ella', 'Emily', 'Emma', 'Ethan', 'Evelyn',
+  'Gabriel', 'Grace', 'Hannah', 'Harper', 'Henry', 'Isabella', 'Jack', 'Jacob', 'James', 'Jasmine',
+  'Jayden', 'Joseph', 'Layla', 'Leo', 'Liam', 'Lily', 'Logan', 'Lucas', 'Mason', 'Mia',
+  'Nathan', 'Noah', 'Nora', 'Oliver', 'Olivia', 'Owen', 'Ryan', 'Samuel', 'Scarlett', 'Sophia',
+  'Theodore', 'Thomas', 'Victoria', 'William', 'Willow', 'Zoe', 'Aaron', 'Alice', 'Isaac', 'Sophie',
+];
+
+function shuffled(values) {
+  const copy = [...values];
+  for (let index = copy.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    [copy[index], copy[swapIndex]] = [copy[swapIndex], copy[index]];
+  }
+  return copy;
+}
+
 async function handleSlash(interaction, config) {
   const name = interaction.commandName;
   if (name === 'deletedata') {
@@ -223,6 +241,66 @@ async function handleSlash(interaction, config) {
         (eligible.length < amount ? ` Only **${eligible.length}** members were eligible.` : '') +
         (failed.length ? ` **${failed.length}** assignment${failed.length === 1 ? '' : 's'} failed.` : '') +
         (visibleNames ? `\n\n**Selected:** ${visibleNames}` : ''),
+      allowedMentions: { parse: [] },
+    });
+  }
+  if (name === 'rename') {
+    if (!interaction.member?.permissions.has(PermissionFlagsBits.Administrator)) {
+      return interaction.reply({ content: 'Only administrators can use this command.', ephemeral: true });
+    }
+
+    await interaction.deferReply({ ephemeral: true });
+    const count = interaction.options.getInteger('count');
+    const members = new Map(interaction.guild.members.cache.map(member => [member.id, member]));
+    try {
+      let after;
+      do {
+        const page = await interaction.guild.members.list({ limit: 1000, after, cache: true });
+        for (const member of page.values()) members.set(member.id, member);
+        if (page.size < 1000) break;
+        after = page.lastKey();
+      } while (after);
+    } catch (error) {
+      console.warn(`[rename] Full member list unavailable; using cached members: ${error.message}`);
+    }
+
+    const manageable = [...members.values()].filter(member =>
+      !member.user.bot &&
+      member.id !== interaction.guild.ownerId &&
+      member.manageable
+    );
+    const online = manageable.filter(member => member.presence && member.presence.status !== 'offline');
+    const usedOnlineFilter = online.length > 0;
+    const candidates = shuffled(usedOnlineFilter ? online : manageable);
+    if (!candidates.length) {
+      return interaction.editReply({ content: 'No manageable members are available. Move my bot role above the members you want renamed.' });
+    }
+
+    const selected = candidates.slice(0, Math.min(count, candidates.length));
+    const names = shuffled(realisticNames);
+    const renamed = [];
+    const failed = [];
+    for (let index = 0; index < selected.length; index += 1) {
+      const member = selected[index];
+      const baseName = names[index % names.length];
+      const nickname = index < names.length ? baseName : `${baseName} ${Math.floor(index / names.length) + 1}`;
+      try {
+        await member.setNickname(nickname, `Random realistic rename requested by ${interaction.user.tag}`);
+        renamed.push(`${member.user.tag} → ${nickname}`);
+      } catch {
+        failed.push(member.user.tag);
+      }
+    }
+
+    const details = renamed.join('\n');
+    const visibleDetails = details.length > 1400 ? `${details.slice(0, 1397)}...` : details;
+    return interaction.editReply({
+      content:
+        `✅ Renamed **${renamed.length}** random ${usedOnlineFilter ? 'online ' : ''}member${renamed.length === 1 ? '' : 's'} with realistic display names.` +
+        (!usedOnlineFilter ? '\nPresence data was unavailable, so the command used manageable members from the available member list.' : '') +
+        (candidates.length < count ? `\nOnly **${candidates.length}** eligible members were available.` : '') +
+        (failed.length ? `\n**${failed.length}** rename${failed.length === 1 ? '' : 's'} failed.` : '') +
+        (visibleDetails ? `\n\n${visibleDetails}` : ''),
       allowedMentions: { parse: [] },
     });
   }
