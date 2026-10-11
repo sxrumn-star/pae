@@ -275,7 +275,7 @@ async function handleSlash(interaction, config) {
       member.manageable
     );
     const online = manageable.filter(member => member.presence && member.presence.status !== 'offline');
-    const usedOnlineFilter = online.length > 0;
+    const usedOnlineFilter = online.length >= Math.min(count, manageable.length);
     const candidates = shuffled(usedOnlineFilter ? online : manageable);
     if (!candidates.length) {
       return interaction.editReply({ content: `No manageable users with the ${targetRole} role are available. Move my bot role above that role and its members.` });
