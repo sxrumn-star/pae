@@ -267,6 +267,25 @@ async function fetchBlockCypherTransactions(address) {
   return incomingTransactions(await response.json());
 }
 
+async function fetchBitapsTransactions(address) {
+  const url = `https://api.bitaps.com/ltc/v1/blockchain/address/transactions/${encodeURIComponent(address)}`;
+  const response = await fetch(url, {
+    headers: { accept: 'application/json', 'user-agent': 'icemm-bot/1.0' },
+    signal: AbortSignal.timeout(15000),
+  });
+  if (!response.ok) throw new Error(`Bitaps Litecoin API returned HTTP ${response.status}`);
+  const payload = await response.json();
+  const transactions = payload?.data?.list;
+  if (!Array.isArray(transactions)) throw new Error('Bitaps Litecoin API returned an invalid response');
+  return transactions
+    .filter(transaction => transaction.txId && Number(transaction.amount || 0) > 0)
+    .map(transaction => ({
+      hash: transaction.txId,
+      value: Number(transaction.amount),
+      confirmations: Number(transaction.confirmations || 0),
+    }));
+}
+
 async function fetchLitecoinSpaceTransactions(address) {
   const baseUrl = `https://litecoinspace.org/api/address/${encodeURIComponent(address)}/txs`;
   const [confirmedResponse, mempoolResponse] = await Promise.all([
@@ -282,10 +301,19 @@ async function fetchLitecoinSpaceTransactions(address) {
 
 async function fetchLitecoinTransactions(address) {
   try {
+    return await fetchBitapsTransactions(address);
+  } catch (bitapsError) {
+    console.error(`[crypto watcher] Bitaps unavailable: ${bitapsError.message}; trying Litecoin Space`);
+  }
+  try {
     return await fetchLitecoinSpaceTransactions(address);
-  } catch (primaryError) {
-    console.error(`[crypto watcher] Litecoin Space unavailable: ${primaryError.message}; trying fallback`);
-    return fetchBlockCypherTransactions(address);
+  } catch (spaceError) {
+    console.error(`[crypto watcher] Litecoin Space unavailable: ${spaceError.message}; trying BlockCypher`);
+  }
+  try {
+    return await fetchBlockCypherTransactions(address);
+  } catch (blockCypherError) {
+    throw new Error(`All Litecoin APIs are temporarily unavailable (${blockCypherError.message})`);
   }
 }
 
@@ -334,9 +362,9 @@ async function startCryptoWatcher(client) {
     }
   };
   await check();
-  const timer = setInterval(check, 30000);
+  const timer = setInterval(check, 60000);
   timer.unref?.();
-  console.log('[crypto watcher] checking Litecoin payments every 30 seconds.');
+  console.log('[crypto watcher] checking Litecoin payments every 60 seconds.');
   return timer;
 }
 
