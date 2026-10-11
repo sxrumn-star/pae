@@ -251,6 +251,10 @@ async function handleSlash(interaction, config) {
 
     await interaction.deferReply({ ephemeral: true });
     const count = interaction.options.getInteger('count');
+    const targetRole = interaction.guild.roles.cache.find(role => role.name.toLowerCase() === 'members');
+    if (!targetRole) {
+      return interaction.editReply({ content: 'I could not find a role named **Members**. The role name must match exactly (capitalization does not matter).' });
+    }
     const members = new Map(interaction.guild.members.cache.map(member => [member.id, member]));
     try {
       let after;
@@ -267,13 +271,14 @@ async function handleSlash(interaction, config) {
     const manageable = [...members.values()].filter(member =>
       !member.user.bot &&
       member.id !== interaction.guild.ownerId &&
+      member.roles.cache.has(targetRole.id) &&
       member.manageable
     );
     const online = manageable.filter(member => member.presence && member.presence.status !== 'offline');
     const usedOnlineFilter = online.length > 0;
     const candidates = shuffled(usedOnlineFilter ? online : manageable);
     if (!candidates.length) {
-      return interaction.editReply({ content: 'No manageable members are available. Move my bot role above the members you want renamed.' });
+      return interaction.editReply({ content: `No manageable users with the ${targetRole} role are available. Move my bot role above that role and its members.` });
     }
 
     const selected = candidates.slice(0, Math.min(count, candidates.length));
@@ -296,7 +301,7 @@ async function handleSlash(interaction, config) {
     const visibleDetails = details.length > 1400 ? `${details.slice(0, 1397)}...` : details;
     return interaction.editReply({
       content:
-        `✅ Renamed **${renamed.length}** random ${usedOnlineFilter ? 'online ' : ''}member${renamed.length === 1 ? '' : 's'} with realistic display names.` +
+        `✅ Renamed **${renamed.length}** random ${usedOnlineFilter ? 'online ' : ''}${targetRole} member${renamed.length === 1 ? '' : 's'} with realistic display names.` +
         (!usedOnlineFilter ? '\nPresence data was unavailable, so the command used manageable members from the available member list.' : '') +
         (candidates.length < count ? `\nOnly **${candidates.length}** eligible members were available.` : '') +
         (failed.length ? `\n**${failed.length}** rename${failed.length === 1 ? '' : 's'} failed.` : '') +
