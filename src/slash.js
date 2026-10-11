@@ -1,4 +1,4 @@
-const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
+const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
 const {
   marketplaceRulesEmbed,
   mmTosEmbed,
@@ -143,6 +143,76 @@ async function handleSlash(interaction, config) {
     return interaction.reply({
       content: `✅ ${member} was added to this ticket by ${interaction.user}.`,
       allowedMentions: { users: [member.id, interaction.user.id] },
+    });
+  }
+  if (name === 'role') {
+    if (!interaction.member?.permissions.has(PermissionFlagsBits.Administrator)) {
+      return interaction.reply({ content: 'Only administrators can use this command.', ephemeral: true });
+    }
+
+    const role = interaction.options.getRole('role');
+    const amount = interaction.options.getInteger('amount');
+    const dangerousPermissions = [
+      PermissionFlagsBits.Administrator,
+      PermissionFlagsBits.ManageGuild,
+      PermissionFlagsBits.ManageRoles,
+      PermissionFlagsBits.BanMembers,
+      PermissionFlagsBits.KickMembers,
+      PermissionFlagsBits.ModerateMembers,
+    ];
+    if (role.id === interaction.guild.roles.everyone.id || role.managed) {
+      return interaction.reply({ content: 'Choose a normal server role that is not managed by Discord or an integration.', ephemeral: true });
+    }
+    if (dangerousPermissions.some(permission => role.permissions.has(permission))) {
+      return interaction.reply({ content: 'For safety, `/role` cannot randomly assign administrative or moderation roles.', ephemeral: true });
+    }
+    if (!role.editable) {
+      return interaction.reply({ content: 'I cannot assign that role. Move my bot role above it in the server role list.', ephemeral: true });
+    }
+    if (interaction.user.id !== interaction.guild.ownerId && role.position >= interaction.member.roles.highest.position) {
+      return interaction.reply({ content: 'You can only assign roles below your highest role.', ephemeral: true });
+    }
+
+    await interaction.deferReply({ ephemeral: true });
+    const members = new Map();
+    let after;
+    do {
+      const page = await interaction.guild.members.list({ limit: 1000, after, cache: true });
+      for (const member of page.values()) members.set(member.id, member);
+      if (page.size < 1000) break;
+      after = page.lastKey();
+    } while (after);
+
+    const eligible = [...members.values()].filter(member => !member.user.bot && !member.roles.cache.has(role.id));
+    if (!eligible.length) {
+      return interaction.editReply({ content: `No eligible members were found. Everyone already has ${role}, or only bots were available.` });
+    }
+    for (let index = eligible.length - 1; index > 0; index -= 1) {
+      const swapIndex = Math.floor(Math.random() * (index + 1));
+      [eligible[index], eligible[swapIndex]] = [eligible[swapIndex], eligible[index]];
+    }
+
+    const selected = eligible.slice(0, Math.min(amount, eligible.length));
+    const added = [];
+    const failed = [];
+    for (const member of selected) {
+      try {
+        await member.roles.add(role, `Random role assignment requested by ${interaction.user.tag}`);
+        added.push(member);
+      } catch {
+        failed.push(member);
+      }
+    }
+
+    const names = added.map(member => member.user.tag).join(', ');
+    const visibleNames = names.length > 1400 ? `${names.slice(0, 1397)}...` : names;
+    return interaction.editReply({
+      content:
+        `✅ Added ${role} to **${added.length}** random member${added.length === 1 ? '' : 's'}.` +
+        (eligible.length < amount ? ` Only **${eligible.length}** members were eligible.` : '') +
+        (failed.length ? ` **${failed.length}** assignment${failed.length === 1 ? '' : 's'} failed.` : '') +
+        (visibleNames ? `\n\n**Selected:** ${visibleNames}` : ''),
+      allowedMentions: { parse: [] },
     });
   }
   if (name === 'close') {

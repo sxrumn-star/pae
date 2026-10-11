@@ -35,6 +35,12 @@ const commands = [
     .setDescription('Add a member to this ticket (MM/Staff only)')
     .addUserOption(o => o.setName('id').setDescription('Member to add to this ticket').setRequired(true)),
   new SlashCommandBuilder()
+    .setName('role')
+    .setDescription('Give a role to random server members (admin)')
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+    .addRoleOption(o => o.setName('role').setDescription('Role to give').setRequired(true))
+    .addIntegerOption(o => o.setName('amount').setDescription('Number of random members').setMinValue(1).setMaxValue(100).setRequired(true)),
+  new SlashCommandBuilder()
     .setName('vouch')
     .setDescription('Leave feedback for a trade')
     .addUserOption(o => o.setName('user').setDescription('Who are you vouching? (usually the MM)').setRequired(true))
