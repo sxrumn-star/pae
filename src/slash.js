@@ -1,4 +1,15 @@
-const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
+const {
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  ContainerBuilder,
+  EmbedBuilder,
+  MessageFlags,
+  PermissionFlagsBits,
+  SectionBuilder,
+  SeparatorBuilder,
+  TextDisplayBuilder,
+} = require('discord.js');
 const {
   marketplaceRulesEmbed,
   mmTosEmbed,
@@ -448,26 +459,33 @@ async function handleSlash(interaction, config) {
     return interaction.reply({ embeds: [reputationEmbed(user, summary)] });
   }
   if (name === 'setup' && interaction.options.getSubcommand() === 'automm') {
-    const embed = new EmbedBuilder()
-      .setTitle('Start Cryptocurrency Deal')
-      .setColor('#57F287')
-      .setDescription(
-        'Choose the cryptocurrency and network for your deal. A private guided ticket will open for both traders.\n\n' +
-        '**₿ Bitcoin** — Bitcoin network\n\n' +
-        '**Ξ Ethereum** — Ethereum network\n\n' +
-        '**Ł Litecoin** — Litecoin network\n\n' +
-        '**◎ Solana** — Solana network'
-      )
-      .setFooter({ text: config.branding?.serverName || 'Crypto Middleman' });
-    const rows = [
-      ['btc', 'Bitcoin'],
-      ['eth', 'Ethereum'],
-      ['ltc', 'Litecoin'],
-      ['sol', 'Solana'],
-    ].map(([key, label]) => new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId(`crypto_open_ticket_${key}`).setLabel(`Start ${label}`).setStyle(ButtonStyle.Success),
+    const coins = [
+      ['btc', '₿', 'Bitcoin', 'Bitcoin network'],
+      ['eth', 'Ξ', 'Ethereum', 'Ethereum network'],
+      ['ltc', 'Ł', 'Litecoin', 'Litecoin network'],
+      ['sol', '◎', 'Solana', 'Solana network'],
+    ];
+    const panel = new ContainerBuilder()
+      .setAccentColor(0x57F287)
+      .addTextDisplayComponents(new TextDisplayBuilder().setContent(
+        '# Start Cryptocurrency Deal\n' +
+        'Choose the coin and network for your deal. A private guided ticket will open for both traders.'
+      ));
+    coins.forEach(([key, symbol, label, network]) => {
+      panel.addSeparatorComponents(new SeparatorBuilder().setDivider(true));
+      panel.addSectionComponents(
+        new SectionBuilder()
+          .addTextDisplayComponents(new TextDisplayBuilder().setContent(`## ${symbol} ${label}\n${network}`))
+          .setButtonAccessory(
+            new ButtonBuilder().setCustomId(`crypto_open_ticket_${key}`).setLabel('Start').setStyle(ButtonStyle.Success)
+          )
+      );
+    });
+    panel.addSeparatorComponents(new SeparatorBuilder().setDivider(true));
+    panel.addTextDisplayComponents(new TextDisplayBuilder().setContent(
+      `-# ${config.branding?.serverName || 'Crypto Middleman'} • Never send funds outside the private ticket instructions.`
     ));
-    await interaction.channel.send({ embeds: [embed], components: rows });
+    await interaction.channel.send({ components: [panel], flags: MessageFlags.IsComponentsV2 });
     return interaction.reply({ content: '✅ Auto middleman panel posted in this channel.', ephemeral: true });
   }
   if (name === 'setup' && interaction.options.getSubcommand() === 'invites') {
