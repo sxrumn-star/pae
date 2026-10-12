@@ -460,12 +460,12 @@ async function handleSlash(interaction, config) {
       )
       .setFooter({ text: config.branding?.serverName || 'Crypto Middleman' });
     const rows = [
-      ['btc', 'Bitcoin', '₿'],
-      ['eth', 'Ethereum', 'Ξ'],
-      ['ltc', 'Litecoin', 'Ł'],
-      ['sol', 'Solana', '◎'],
-    ].map(([key, label, emoji]) => new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId(`crypto_open_ticket_${key}`).setLabel(`Start ${label}`).setStyle(ButtonStyle.Success).setEmoji(emoji),
+      ['btc', 'Bitcoin'],
+      ['eth', 'Ethereum'],
+      ['ltc', 'Litecoin'],
+      ['sol', 'Solana'],
+    ].map(([key, label]) => new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId(`crypto_open_ticket_${key}`).setLabel(`Start ${label}`).setStyle(ButtonStyle.Success),
     ));
     await interaction.channel.send({ embeds: [embed], components: rows });
     return interaction.reply({ content: '✅ Auto middleman panel posted in this channel.', ephemeral: true });
