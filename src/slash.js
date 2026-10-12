@@ -372,16 +372,30 @@ async function handleSlash(interaction, config) {
 
     const selected = candidates.slice(0, Math.min(count, candidates.length));
     const names = shuffled(realisticNames);
+    const usedDisplayNames = new Set(
+      [...members.values()].map(member => member.displayName.trim().toLowerCase())
+    );
+    function nextUniqueName(index) {
+      for (let offset = 0; offset < names.length; offset += 1) {
+        const candidate = names[(index + offset) % names.length];
+        if (!usedDisplayNames.has(candidate.toLowerCase())) return candidate;
+      }
+      const baseName = names[index % names.length];
+      let suffix = 2;
+      while (usedDisplayNames.has(`${baseName} ${suffix}`.toLowerCase())) suffix += 1;
+      return `${baseName} ${suffix}`;
+    }
     const renamed = [];
     const failed = [];
     for (let index = 0; index < selected.length; index += 1) {
       const member = selected[index];
-      const baseName = names[index % names.length];
-      const nickname = index < names.length ? baseName : `${baseName} ${Math.floor(index / names.length) + 1}`;
+      const nickname = nextUniqueName(index);
+      usedDisplayNames.add(nickname.toLowerCase());
       try {
         await member.setNickname(nickname, `Random realistic rename requested by ${interaction.user.tag}`);
         renamed.push(`${member.user.tag} → ${nickname}`);
       } catch {
+        usedDisplayNames.delete(nickname.toLowerCase());
         failed.push(member.user.tag);
       }
     }
