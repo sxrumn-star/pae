@@ -3,6 +3,7 @@ const { appRoot } = require('./runtime');
 const { readEncryptedJson, writeEncryptedJson } = require('./secureStore');
 
 const dataPath = path.join(appRoot, 'data', 'rename-jobs.json');
+const historyPath = path.join(appRoot, 'data', 'rename-history.json');
 const MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 const activeGuilds = new Set();
 const realisticNames = [
@@ -26,6 +27,18 @@ function loadJobs() {
   }
   if (changed) writeEncryptedJson(dataPath, jobs);
   return jobs;
+}
+
+function getRenamedMemberIds(guildId) {
+  const history = readEncryptedJson(historyPath, () => ({}));
+  return new Set(Array.isArray(history[guildId]) ? history[guildId] : []);
+}
+
+function rememberRenamedMembers(guildId, memberIds) {
+  if (!memberIds.length) return;
+  const history = readEncryptedJson(historyPath, () => ({}));
+  history[guildId] = [...new Set([...(history[guildId] || []), ...memberIds])];
+  writeEncryptedJson(historyPath, history);
 }
 
 function scheduleRenameJob({ guildId, channelId, requestedById, roleId, remaining, processedIds = [] }) {
@@ -109,7 +122,19 @@ function deleteUserRenameData(userId) {
     job.processedIds = job.processedIds.filter(id => id !== userId);
   }
   writeEncryptedJson(dataPath, jobs);
+  const history = readEncryptedJson(historyPath, () => ({}));
+  for (const [guildId, memberIds] of Object.entries(history)) {
+    history[guildId] = memberIds.filter(id => id !== userId);
+  }
+  writeEncryptedJson(historyPath, history);
   return removed;
 }
 
-module.exports = { cancelRenameJob, deleteUserRenameData, processRenameCandidate, scheduleRenameJob };
+module.exports = {
+  cancelRenameJob,
+  deleteUserRenameData,
+  getRenamedMemberIds,
+  processRenameCandidate,
+  rememberRenamedMembers,
+  scheduleRenameJob,
+};

@@ -25,7 +25,12 @@ const { deleteUserReputation, getReputation, giveReputation } = require('./reput
 const { saveConfig } = require('./config');
 const { deleteUserCryptoSessions, scheduleCryptoConfirmation } = require('./cryptoEscrow');
 const { startTxidFeed, stopTxidFeed } = require('./txidFeed');
-const { cancelRenameJob, deleteUserRenameData } = require('./renameJobs');
+const {
+  cancelRenameJob,
+  deleteUserRenameData,
+  getRenamedMemberIds,
+  rememberRenamedMembers,
+} = require('./renameJobs');
 
 function reputationEmbed(user, summary, title = 'Reputation') {
   const average = summary.count ? summary.average.toFixed(2) : 'No ratings yet';
@@ -61,7 +66,7 @@ function hasRenameRole(member, targetRoleId, excludedRoleIds) {
     !member.roles.cache.some(role => excludedRoleIds.has(role.id));
 }
 
-async function collectRecentlyActiveMembers(guild, members, targetRoleId, excludedRoleIds, wanted) {
+async function collectRecentlyActiveMembers(guild, members, targetRoleId, excludedRoleIds, previouslyRenamedIds, wanted) {
   const channels = await guild.channels.fetch().catch(() => null);
   if (!channels) return 0;
   const readable = shuffled([...channels.values()].filter(channel =>
@@ -94,6 +99,7 @@ async function collectRecentlyActiveMembers(guild, members, targetRoleId, exclud
         const eligibleFound = [...members.values()].filter(member =>
           !member.user.bot &&
           member.id !== guild.ownerId &&
+          !previouslyRenamedIds.has(member.id) &&
           hasRenameRole(member, targetRoleId, excludedRoleIds) &&
           member.manageable
         ).length;
@@ -103,6 +109,7 @@ async function collectRecentlyActiveMembers(guild, members, targetRoleId, exclud
       const eligibleFound = [...members.values()].filter(member =>
         !member.user.bot &&
         member.id !== guild.ownerId &&
+        !previouslyRenamedIds.has(member.id) &&
         hasRenameRole(member, targetRoleId, excludedRoleIds) &&
         member.manageable
       ).length;
@@ -332,6 +339,7 @@ async function handleSlash(interaction, config) {
     const excludedRoleIds = new Set(interaction.guild.roles.cache
       .filter(role => role.name.trim().toLowerCase() === 'members')
       .keys());
+    const previouslyRenamedIds = getRenamedMemberIds(interaction.guildId);
     const members = new Map(interaction.guild.members.cache.map(member => [member.id, member]));
     let fullListAvailable = true;
     try {
@@ -350,16 +358,18 @@ async function handleSlash(interaction, config) {
     const cachedEligibleCount = [...members.values()].filter(member =>
       !member.user.bot &&
       member.id !== interaction.guild.ownerId &&
+      !previouslyRenamedIds.has(member.id) &&
       hasRenameRole(member, targetRole.id, excludedRoleIds) &&
       member.manageable
     ).length;
     if (!fullListAvailable && cachedEligibleCount < count) {
-      await collectRecentlyActiveMembers(interaction.guild, members, targetRole.id, excludedRoleIds, count);
+      await collectRecentlyActiveMembers(interaction.guild, members, targetRole.id, excludedRoleIds, previouslyRenamedIds, count);
     }
 
     const manageable = [...members.values()].filter(member =>
       !member.user.bot &&
       member.id !== interaction.guild.ownerId &&
+      !previouslyRenamedIds.has(member.id) &&
       hasRenameRole(member, targetRole.id, excludedRoleIds) &&
       member.manageable
     );
@@ -367,7 +377,7 @@ async function handleSlash(interaction, config) {
     const usedOnlineFilter = online.length >= Math.min(count, manageable.length);
     const candidates = shuffled(usedOnlineFilter ? online : manageable);
     if (!candidates.length) {
-      return interaction.editReply({ content: 'No manageable users with **Member** and without **Members** are currently available.' });
+      return interaction.editReply({ content: 'No new manageable users with **Member** and without **Members** are currently available. Users renamed by earlier runs are skipped.' });
     }
 
     const selected = candidates.slice(0, Math.min(count, candidates.length));
@@ -386,6 +396,7 @@ async function handleSlash(interaction, config) {
       return `${baseName} ${suffix}`;
     }
     const renamed = [];
+    const renamedIds = [];
     const failed = [];
     for (let index = 0; index < selected.length; index += 1) {
       const member = selected[index];
@@ -394,11 +405,13 @@ async function handleSlash(interaction, config) {
       try {
         await member.setNickname(nickname, `Random realistic rename requested by ${interaction.user.tag}`);
         renamed.push(`${member.user.tag} → ${nickname}`);
+        renamedIds.push(member.id);
       } catch {
         usedDisplayNames.delete(nickname.toLowerCase());
         failed.push(member.user.tag);
       }
     }
+    rememberRenamedMembers(interaction.guildId, renamedIds);
 
     const details = renamed.join('\n');
     const visibleDetails = details.length > 1400 ? `${details.slice(0, 1397)}...` : details;
