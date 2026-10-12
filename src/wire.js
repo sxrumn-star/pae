@@ -3,7 +3,6 @@ const { createMmTicket } = require('./tickets');
 const { handleButtons } = require('./interactions');
 const { handleSlash } = require('./slash');
 const { handleCryptoModal } = require('./cryptoEscrow');
-const { processRenameCandidate } = require('./renameJobs');
 
 function wire(client, config) {
   client.on('interactionCreate', async (interaction) => {
@@ -34,7 +33,6 @@ function wire(client, config) {
   });
   client.on('messageCreate', async (msg) => {
     if (msg.author.bot || !msg.guild) return;
-    await processRenameCandidate(msg.member, msg.channel).catch(error => console.error('[rename job] error:', error));
     const c = msg.content.trim().toLowerCase();
     if (c === '!rules') return msg.channel.send({ embeds: [marketplaceRulesEmbed(config)] });
     if (c === '!tos' || c === '!mmtos') return msg.channel.send({ embeds: [mmTosEmbed(config)] });

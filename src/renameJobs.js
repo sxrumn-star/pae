@@ -46,6 +46,16 @@ function scheduleRenameJob({ guildId, channelId, requestedById, roleId, remainin
   writeEncryptedJson(dataPath, jobs);
 }
 
+function cancelRenameJob(guildId) {
+  const jobs = loadJobs();
+  const existed = Boolean(jobs[guildId]);
+  if (existed) {
+    delete jobs[guildId];
+    writeEncryptedJson(dataPath, jobs);
+  }
+  return existed;
+}
+
 async function processRenameCandidate(member, channel) {
   if (!member?.guild || member.user.bot || activeGuilds.has(member.guild.id)) return false;
   const jobs = loadJobs();
@@ -102,4 +112,4 @@ function deleteUserRenameData(userId) {
   return removed;
 }
 
-module.exports = { deleteUserRenameData, processRenameCandidate, scheduleRenameJob };
+module.exports = { cancelRenameJob, deleteUserRenameData, processRenameCandidate, scheduleRenameJob };

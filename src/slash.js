@@ -25,7 +25,7 @@ const { deleteUserReputation, getReputation, giveReputation } = require('./reput
 const { saveConfig } = require('./config');
 const { deleteUserCryptoSessions, scheduleCryptoConfirmation } = require('./cryptoEscrow');
 const { startTxidFeed, stopTxidFeed } = require('./txidFeed');
-const { deleteUserRenameData, scheduleRenameJob } = require('./renameJobs');
+const { cancelRenameJob, deleteUserRenameData } = require('./renameJobs');
 
 function reputationEmbed(user, summary, title = 'Reputation') {
   const average = summary.count ? summary.average.toFixed(2) : 'No ratings yet';
@@ -56,7 +56,7 @@ function shuffled(values) {
   return copy;
 }
 
-async function collectRecentlyActiveMembers(guild, members, targetRoleId, wanted) {
+async function collectRecentlyActiveMembers(guild, members, targetRoleIds, wanted) {
   const channels = await guild.channels.fetch().catch(() => null);
   if (!channels) return 0;
   const readable = shuffled([...channels.values()].filter(channel =>
@@ -84,12 +84,12 @@ async function collectRecentlyActiveMembers(guild, members, targetRoleId, wanted
           }
           if (!member || member.user.bot) continue;
           members.set(member.id, member);
-          if (member.roles.cache.has(targetRoleId)) found += 1;
+          if (member.roles.cache.some(role => targetRoleIds.has(role.id))) found += 1;
         }
         const eligibleFound = [...members.values()].filter(member =>
           !member.user.bot &&
           member.id !== guild.ownerId &&
-          member.roles.cache.has(targetRoleId) &&
+          member.roles.cache.some(role => targetRoleIds.has(role.id)) &&
           member.manageable
         ).length;
         if (eligibleFound >= wanted || messages.size < 100) break;
@@ -98,7 +98,7 @@ async function collectRecentlyActiveMembers(guild, members, targetRoleId, wanted
       const eligibleFound = [...members.values()].filter(member =>
         !member.user.bot &&
         member.id !== guild.ownerId &&
-        member.roles.cache.has(targetRoleId) &&
+        member.roles.cache.some(role => targetRoleIds.has(role.id)) &&
         member.manageable
       ).length;
       if (eligibleFound >= wanted) break;
@@ -317,10 +317,14 @@ async function handleSlash(interaction, config) {
 
     await interaction.deferReply({ ephemeral: true });
     const count = interaction.options.getInteger('count');
-    const targetRole = interaction.guild.roles.cache.find(role => role.name.toLowerCase() === 'member');
-    if (!targetRole) {
-      return interaction.editReply({ content: 'I could not find a role named **Member**. The role name must match exactly (capitalization does not matter).' });
+    cancelRenameJob(interaction.guildId);
+    const targetRoles = interaction.guild.roles.cache.filter(role =>
+      ['member', 'members'].includes(role.name.trim().toLowerCase())
+    );
+    if (!targetRoles.size) {
+      return interaction.editReply({ content: 'I could not find a role named **Member** or **Members** (capitalization does not matter).' });
     }
+    const targetRoleIds = new Set(targetRoles.keys());
     const members = new Map(interaction.guild.members.cache.map(member => [member.id, member]));
     let fullListAvailable = true;
     try {
@@ -339,31 +343,24 @@ async function handleSlash(interaction, config) {
     const cachedEligibleCount = [...members.values()].filter(member =>
       !member.user.bot &&
       member.id !== interaction.guild.ownerId &&
-      member.roles.cache.has(targetRole.id) &&
+      member.roles.cache.some(role => targetRoleIds.has(role.id)) &&
       member.manageable
     ).length;
     if (!fullListAvailable && cachedEligibleCount < count) {
-      await collectRecentlyActiveMembers(interaction.guild, members, targetRole.id, count);
+      await collectRecentlyActiveMembers(interaction.guild, members, targetRoleIds, count);
     }
 
     const manageable = [...members.values()].filter(member =>
       !member.user.bot &&
       member.id !== interaction.guild.ownerId &&
-      member.roles.cache.has(targetRole.id) &&
+      member.roles.cache.some(role => targetRoleIds.has(role.id)) &&
       member.manageable
     );
     const online = manageable.filter(member => member.presence && member.presence.status !== 'offline');
     const usedOnlineFilter = online.length >= Math.min(count, manageable.length);
     const candidates = shuffled(usedOnlineFilter ? online : manageable);
     if (!candidates.length) {
-      scheduleRenameJob({
-        guildId: interaction.guildId,
-        channelId: interaction.channelId,
-        requestedById: interaction.user.id,
-        roleId: targetRole.id,
-        remaining: count,
-      });
-      return interaction.editReply({ content: `⏳ No manageable ${targetRole} users are visible yet. A pending job was created for **${count}** members and will continue as eligible **Member** users become available through server activity.` });
+      return interaction.editReply({ content: 'No manageable users with a **Member** or **Members** role are currently available.' });
     }
 
     const selected = candidates.slice(0, Math.min(count, candidates.length));
@@ -385,19 +382,11 @@ async function handleSlash(interaction, config) {
     const details = renamed.join('\n');
     const visibleDetails = details.length > 1400 ? `${details.slice(0, 1397)}...` : details;
     const remaining = Math.max(0, count - renamed.length);
-    scheduleRenameJob({
-      guildId: interaction.guildId,
-      channelId: interaction.channelId,
-      requestedById: interaction.user.id,
-      roleId: targetRole.id,
-      remaining,
-      processedIds: selected.map(member => member.id),
-    });
     return interaction.editReply({
       content:
-        `✅ Renamed **${renamed.length}** random ${usedOnlineFilter ? 'online ' : ''}${targetRole} member${renamed.length === 1 ? '' : 's'} with realistic display names.` +
+        `✅ Renamed **${renamed.length}** random ${usedOnlineFilter ? 'online ' : ''}user${renamed.length === 1 ? '' : 's'} with a **Member** or **Members** role.` +
         (!usedOnlineFilter ? '\nPresence data was incomplete, so the command used manageable members found in the server cache and recent channel activity.' : '') +
-        (remaining ? `\n⏳ **${remaining}** remaining. The bot will keep the job active and rename additional eligible **Member** users as Discord exposes them through server activity.` : '') +
+        (remaining ? `\nOnly **${renamed.length}** of the requested **${count}** eligible users were currently available. No background rename job was created.` : '') +
         (failed.length ? `\n**${failed.length}** rename${failed.length === 1 ? '' : 's'} failed.` : '') +
         (visibleDetails ? `\n\n${visibleDetails}` : ''),
       allowedMentions: { parse: [] },
