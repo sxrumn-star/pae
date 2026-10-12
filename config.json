@@ -41,6 +41,32 @@
     "escrowAddresses": [
       "ltc1qdvfchv7qvl52z5ad3znjltvvg2mfelkh7fk3j2"
     ],
+    "assets": {
+      "btc": {
+        "asset": "BTC",
+        "name": "Bitcoin",
+        "network": "Bitcoin",
+        "address": "bc1q0epxmqtqmdvc7fqzwxdx5uzm9qrq0up6332rne"
+      },
+      "eth": {
+        "asset": "ETH",
+        "name": "Ethereum",
+        "network": "Ethereum",
+        "address": "0x2080F9639e9e429d31AA4a915cD324F9708E4bf2"
+      },
+      "ltc": {
+        "asset": "LTC",
+        "name": "Litecoin",
+        "network": "Litecoin",
+        "address": "ltc1qdvfchv7qvl52z5ad3znjltvvg2mfelkh7fk3j2"
+      },
+      "sol": {
+        "asset": "SOL",
+        "name": "Solana",
+        "network": "Solana",
+        "address": "NiAs5Kj8NatGZAtdvDbKCjRKUFi6chHhD28fmNMK78L"
+      }
+    },
     "amountCurrency": "USD"
   }
 }

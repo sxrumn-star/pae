@@ -449,22 +449,25 @@ async function handleSlash(interaction, config) {
   }
   if (name === 'setup' && interaction.options.getSubcommand() === 'automm') {
     const embed = new EmbedBuilder()
-      .setTitle('Automatic Crypto Middleman')
-      .setColor('#5865F2')
+      .setTitle('Start Cryptocurrency Deal')
+      .setColor('#57F287')
       .setDescription(
-        'Trade crypto safely through a private guided middleman ticket.\n\n' +
-        '**How it works**\n' +
-        '1. Click the button below and enter the other trader’s Discord user ID.\n' +
-        '2. Choose Buyer and Seller, then both users confirm.\n' +
-        '3. Buyer enters the amount and Seller confirms it.\n' +
-        '4. Buyer receives the escrow payment instructions.\n\n' +
-        'Never send funds outside the private ticket instructions.'
+        'Choose the cryptocurrency and network for your deal. A private guided ticket will open for both traders.\n\n' +
+        '**₿ Bitcoin** — Bitcoin network\n\n' +
+        '**Ξ Ethereum** — Ethereum network\n\n' +
+        '**Ł Litecoin** — Litecoin network\n\n' +
+        '**◎ Solana** — Solana network'
       )
       .setFooter({ text: config.branding?.serverName || 'Crypto Middleman' });
-    const row = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId('crypto_open_ticket').setLabel('Open Auto Middleman').setStyle(ButtonStyle.Success).setEmoji('🔐'),
-    );
-    await interaction.channel.send({ embeds: [embed], components: [row] });
+    const rows = [
+      ['btc', 'Bitcoin', '₿'],
+      ['eth', 'Ethereum', 'Ξ'],
+      ['ltc', 'Litecoin', 'Ł'],
+      ['sol', 'Solana', '◎'],
+    ].map(([key, label, emoji]) => new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId(`crypto_open_ticket_${key}`).setLabel(`Start ${label}`).setStyle(ButtonStyle.Success).setEmoji(emoji),
+    ));
+    await interaction.channel.send({ embeds: [embed], components: rows });
     return interaction.reply({ content: '✅ Auto middleman panel posted in this channel.', ephemeral: true });
   }
   if (name === 'setup' && interaction.options.getSubcommand() === 'invites') {

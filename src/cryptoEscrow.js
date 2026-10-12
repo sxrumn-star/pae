@@ -19,6 +19,28 @@ const dataDir = path.join(appRoot, 'data');
 const dataPath = path.join(dataDir, 'crypto-sessions.json');
 const pendingConfirmationTimers = new Map();
 
+const COINS = {
+  btc: { asset: 'BTC', name: 'Bitcoin', network: 'Bitcoin', emoji: '₿' },
+  eth: { asset: 'ETH', name: 'Ethereum', network: 'Ethereum', emoji: 'Ξ' },
+  ltc: { asset: 'LTC', name: 'Litecoin', network: 'Litecoin', emoji: 'Ł' },
+  sol: { asset: 'SOL', name: 'Solana', network: 'Solana', emoji: '◎' },
+};
+
+function coinDetails(config, coinKey = 'ltc') {
+  const key = COINS[coinKey] ? coinKey : 'ltc';
+  const defaults = COINS[key];
+  const configured = config.crypto?.assets?.[key] || {};
+  const legacyAddress = key === 'ltc'
+    ? (config.crypto?.escrowAddress || config.crypto?.escrowAddresses?.[0])
+    : null;
+  return {
+    key,
+    ...defaults,
+    ...configured,
+    address: configured.address || legacyAddress,
+  };
+}
+
 function readSessions() {
   try {
     const sessions = readEncryptedJson(dataPath, () => ({}));
@@ -114,9 +136,9 @@ function mutualCancelButtons() {
   );
 }
 
-function payoutAddressButton() {
+function payoutAddressButton(coin) {
   return new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId('crypto_enter_payout_address').setLabel('Enter Litecoin Address').setStyle(ButtonStyle.Primary).setEmoji('📝'),
+    new ButtonBuilder().setCustomId('crypto_enter_payout_address').setLabel(`Enter ${coin.name} Address`).setStyle(ButtonStyle.Primary).setEmoji('📝'),
   );
 }
 
@@ -160,6 +182,14 @@ function isValidLitecoinAddress(address) {
   return checksum === 1 || checksum === 0x2bc830a3;
 }
 
+function isValidPayoutAddress(address, coinKey) {
+  if (coinKey === 'ltc') return isValidLitecoinAddress(address);
+  if (coinKey === 'eth') return /^0x[a-fA-F0-9]{40}$/.test(address);
+  if (coinKey === 'btc') return /^(?:bc1[a-zA-HJ-NP-Z0-9]{11,87}|[13][a-km-zA-HJ-NP-Z1-9]{25,34})$/i.test(address);
+  if (coinKey === 'sol') return /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(address);
+  return false;
+}
+
 async function findCryptoTicket(guild, reference) {
   const value = String(reference).trim();
   const mentionMatch = value.match(/^<#(\d{15,25})>$/);
@@ -192,7 +222,7 @@ async function confirmCryptoPayment(guild, ticketReference, confirmedBy) {
       .setDescription(
         '✅ **Payment confirmed.**\n\n' +
         `<@${sellerId}>, release the agreed item/service to the buyer <@${buyerId}> now.\n\n` +
-        'After the buyer receives the item, MM/Staff can click **Release Money** below.'
+        'After the buyer receives the item, the **Release Money** button becomes available.'
       )
       .setFooter({ text: 'The button records the release in Discord; it does not send a blockchain transaction.' })
       .setTimestamp()],
@@ -357,7 +387,7 @@ async function startCryptoWatcher(client) {
     checking = true;
     try {
       const sessions = readSessions();
-      const waiting = Object.values(sessions).filter(session => session.phase === 'awaiting_payment' && session.depositAddress);
+      const waiting = Object.values(sessions).filter(session => session.phase === 'awaiting_payment' && session.depositAddress && (session.coinKey || 'ltc') === 'ltc');
       for (const session of waiting) {
         try {
           const transactions = await fetchLitecoinTransactions(session.depositAddress);
@@ -382,7 +412,7 @@ async function startCryptoWatcher(client) {
                 `The bot detected **${(detected.value / 100000000).toFixed(8)} LTC** sent to the ticket wallet.\n\n` +
                 `**Transaction**\n\`${detected.hash}\`\n` +
                 `**Confirmations:** ${detected.confirmations}\n\n` +
-                'MM/Staff should verify the amount and transaction on-chain, then use `/confirm` from any channel.'
+                'Payment detected. The ticket will continue through the normal confirmation flow.'
               )
               .setTimestamp()],
           });
@@ -434,20 +464,20 @@ function updatedAmountButtons() {
 
 async function preparePayment(channelId, config) {
   const session = getSession(channelId);
-  const crypto = config.crypto || {};
-  const addresses = Array.isArray(crypto.escrowAddresses) && crypto.escrowAddresses.length
-    ? crypto.escrowAddresses.filter(isConfigured)
-    : (isConfigured(crypto.escrowAddress) ? [crypto.escrowAddress] : []);
-  if (!isConfigured(crypto.asset) || !isConfigured(crypto.network) || !addresses.length) {
-    throw new Error('No real escrow wallet is configured. Ask an admin to add a verified receiving address.');
+  const coin = coinDetails(config, session.coinKey);
+  if (!isConfigured(coin.address)) {
+    throw new Error(`No ${coin.name} escrow wallet is configured.`);
   }
   // Every ticket intentionally uses the same configured escrow wallet.
   // Transaction baselines still prevent an older transfer from being treated
   // as a new payment when a ticket begins watching the shared address.
-  const depositAddress = addresses[0];
-  const baseline = await fetchLitecoinTransactions(depositAddress);
+  const depositAddress = coin.address;
+  const baseline = coin.key === 'ltc' ? await fetchLitecoinTransactions(depositAddress) : [];
   const next = updateSession(channelId, {
     phase: 'awaiting_payment',
+    coinKey: coin.key,
+    asset: coin.asset,
+    network: coin.network,
     depositAddress,
     seenTxHashes: baseline.map(transaction => transaction.hash),
     watchStartedAt: new Date().toISOString(),
@@ -456,15 +486,17 @@ async function preparePayment(channelId, config) {
   return {
     content: `<@${buyerId}>`,
     embeds: [new EmbedBuilder()
-      .setTitle('🔐 Step 4 of 4 — Send Litecoin')
+      .setTitle(`🔐 Step 4 of 4 — Send ${coin.name}`)
       .setColor('#FEE75C')
-      .setDescription('Send the payment exactly as shown below. The bot is already watching the wallet—no payment button is needed.')
+      .setDescription(coin.key === 'ltc'
+        ? 'Send the payment exactly as shown below. The bot is watching the wallet automatically.'
+        : 'Send the payment exactly as shown below. The ticket will update when payment is confirmed.')
       .addFields(
-        { name: 'Trade value', value: `**$${next.amount} USD worth of ${crypto.asset}**`, inline: true },
-        { name: 'Network', value: `**${crypto.network}**`, inline: true },
+        { name: 'Trade value', value: `**$${next.amount} USD worth of ${coin.asset}**`, inline: true },
+        { name: 'Network', value: `**${coin.network}**`, inline: true },
         { name: 'Escrow address', value: `\`${next.depositAddress}\`` },
       )
-      .setFooter({ text: 'Only use the Litecoin network. A wrong network or address can permanently lose funds.' })
+      .setFooter({ text: `Only use the ${coin.network} network. A wrong network or address can permanently lose funds.` })
       .setTimestamp()],
     components: [new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId('crypto_cancel').setLabel('Cancel Before Payment').setStyle(ButtonStyle.Danger),
@@ -473,6 +505,7 @@ async function preparePayment(channelId, config) {
 }
 
 async function createCryptoTicket(guild, opener, counterparty, tradeTerms, config) {
+  const coin = coinDetails(config, tradeTerms.coinKey);
   const overwrites = [
     { id: guild.roles.everyone.id, deny: [PermissionFlagsBits.ViewChannel] },
     { id: opener.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory] },
@@ -501,6 +534,9 @@ async function createCryptoTicket(guild, opener, counterparty, tradeTerms, confi
     counterpartyId: counterparty.id,
     buyerGives: tradeTerms.buyerGives,
     sellerGives: tradeTerms.sellerGives,
+    coinKey: coin.key,
+    asset: coin.asset,
+    network: coin.network,
     roles: {},
     confirmations: [],
     phase: 'selecting_roles',
@@ -519,8 +555,10 @@ async function createCryptoTicket(guild, opener, counterparty, tradeTerms, confi
       { name: 'Trader Two', value: `${counterparty}`, inline: true },
       { name: '🛒 Buyer gives', value: tradeTerms.buyerGives },
       { name: '💼 Seller gives', value: tradeTerms.sellerGives },
-      { name: 'Buyer', value: 'Sends Litecoin to the escrow wallet after the price is accepted.' },
-      { name: 'Seller', value: 'Releases the item/service after staff confirms payment.' },
+      { name: 'Cryptocurrency', value: `${coin.emoji} **${coin.name} (${coin.asset})**`, inline: true },
+      { name: 'Network', value: `**${coin.network}**`, inline: true },
+      { name: 'Buyer', value: `Sends ${coin.name} to the escrow wallet after the price is accepted.` },
+      { name: 'Seller', value: 'Releases the item/service after payment is confirmed.' },
     )
     .setFooter({ text: 'Do not send any funds until Step 4 shows the payment address.' });
   await channel.send({ content: `${opener} ${counterparty}`, embeds: [embed], components: [roleButtons()] });
@@ -528,8 +566,11 @@ async function createCryptoTicket(guild, opener, counterparty, tradeTerms, confi
 }
 
 async function handleCryptoButton(interaction, config) {
-  if (interaction.customId === 'crypto_open_ticket') {
-    const modal = new ModalBuilder().setCustomId('crypto_start_modal').setTitle('Open Crypto Middleman');
+  const openMatch = interaction.customId.match(/^crypto_open_ticket_(btc|eth|ltc|sol)$/);
+  if (openMatch || interaction.customId === 'crypto_open_ticket') {
+    const coinKey = openMatch?.[1] || 'ltc';
+    const coin = coinDetails(config, coinKey);
+    const modal = new ModalBuilder().setCustomId(`crypto_start_modal_${coinKey}`).setTitle(`Open ${coin.name} Middleman`);
     modal.addComponents(new ActionRowBuilder().addComponents(
       new TextInputBuilder()
         .setCustomId('counterparty')
@@ -544,7 +585,7 @@ async function handleCryptoButton(interaction, config) {
       new TextInputBuilder()
         .setCustomId('buyerGives')
         .setLabel('What does the buyer give?')
-        .setPlaceholder('Example: $50 worth of Litecoin')
+        .setPlaceholder(`Example: $50 worth of ${coin.name}`)
         .setStyle(TextInputStyle.Paragraph)
         .setRequired(true)
         .setMaxLength(500),
@@ -566,7 +607,7 @@ async function handleCryptoButton(interaction, config) {
 
   if (interaction.customId === 'crypto_cancel') {
     if (!isParticipant(session, interaction.user.id) && !canManage(interaction.member, config)) {
-      return interaction.reply({ content: 'Only a trader or staff member can cancel this session.', ephemeral: true });
+      return interaction.reply({ content: 'Only a trader or an authorized administrator can cancel this session.', ephemeral: true });
     }
     if (['payment_detected', 'awaiting_staff_confirmation', 'confirmation_pending', 'funded', 'mutual_cancel_pending', 'awaiting_payout_address', 'confirming_payout_address', 'released'].includes(session.phase)) {
       return interaction.reply({ content: 'This ticket cannot be cancelled normally after payment was submitted. After payment is confirmed, the buyer can use **Request Mutual Cancel**, and both traders must approve it.', ephemeral: true });
@@ -713,8 +754,8 @@ async function handleCryptoButton(interaction, config) {
   }
 
   if (interaction.customId === 'crypto_staff_received') {
-    if (!canManage(interaction.member, config)) return interaction.reply({ content: 'Only MM / Staff can confirm escrow receipt.', ephemeral: true });
-    if (session.phase !== 'awaiting_staff_confirmation') return interaction.reply({ content: 'No submitted payment is waiting for staff confirmation.', ephemeral: true });
+    if (!canManage(interaction.member, config)) return interaction.reply({ content: 'Only an authorized administrator can confirm escrow receipt.', ephemeral: true });
+    if (session.phase !== 'awaiting_staff_confirmation') return interaction.reply({ content: 'No submitted payment is waiting for confirmation.', ephemeral: true });
     const next = updateSession(interaction.channelId, { phase: 'funded', receivedBy: interaction.user.id });
     const sellerId = userForRole(next, 'seller');
     const buyerId = userForRole(next, 'buyer');
@@ -722,7 +763,7 @@ async function handleCryptoButton(interaction, config) {
       embeds: [new EmbedBuilder()
         .setTitle('Payment Confirmed — Release the Item')
         .setColor('#57F287')
-        .setDescription(`✅ **Payment confirmed.**\n\n<@${sellerId}>, release the agreed item/service to the buyer <@${buyerId}> now.\n\nAfter the buyer receives the item, MM/Staff can click **Release Money** below.`)
+        .setDescription(`✅ **Payment confirmed.**\n\n<@${sellerId}>, release the agreed item/service to the buyer <@${buyerId}> now.\n\nAfter the buyer receives the item, use **Release Money** below.`)
         .setFooter({ text: 'The button records the release in Discord; it does not send a blockchain transaction.' })],
       components: [releaseMoneyButtons()],
     });
@@ -788,7 +829,7 @@ async function handleCryptoButton(interaction, config) {
 
   if (interaction.customId === 'crypto_release_money') {
     if (!canManage(interaction.member, config)) {
-      return interaction.reply({ content: 'Only an administrator, MM, or Staff member can release the payment.', ephemeral: true });
+      return interaction.reply({ content: 'Only an authorized administrator can release the payment.', ephemeral: true });
     }
     if (session.phase === 'released') {
       return interaction.reply({ content: 'This payment was already marked as released.', ephemeral: true });
@@ -798,6 +839,7 @@ async function handleCryptoButton(interaction, config) {
     }
     const buyerId = userForRole(session, 'buyer');
     const sellerId = userForRole(session, 'seller');
+    const coin = coinDetails(config, session.coinKey);
     try {
       await interaction.channel.permissionOverwrites.edit(buyerId, { SendMessages: false });
     } catch (error) {
@@ -811,14 +853,14 @@ async function handleCryptoButton(interaction, config) {
     return interaction.reply({
       content: `<@${sellerId}>`,
       embeds: [new EmbedBuilder()
-        .setTitle('💸 Enter Your Litecoin Payout Address')
+        .setTitle(`💸 Enter Your ${coin.name} Payout Address`)
         .setColor('#5865F2')
         .setDescription(
           `Payment release is ready for **$${session.amount} USD**.\n\n` +
-          'Seller, click below and enter the Litecoin address where you want the payment recorded as sent.'
+          `Seller, click below and enter the ${coin.name} address where you want the payment recorded as sent.`
         )
         .setFooter({ text: 'The buyer is now locked from sending messages in this ticket.' })],
-      components: [payoutAddressButton()],
+      components: [payoutAddressButton(coin)],
     });
   }
 
@@ -829,12 +871,13 @@ async function handleCryptoButton(interaction, config) {
     if (participantRole(session, interaction.user.id) !== 'seller') {
       return interaction.reply({ content: 'Only the seller can enter the payout address.', ephemeral: true });
     }
-    const modal = new ModalBuilder().setCustomId('crypto_payout_address_modal').setTitle('Seller Litecoin Address');
+    const coin = coinDetails(config, session.coinKey);
+    const modal = new ModalBuilder().setCustomId('crypto_payout_address_modal').setTitle(`Seller ${coin.name} Address`);
     modal.addComponents(new ActionRowBuilder().addComponents(
       new TextInputBuilder()
         .setCustomId('payoutAddress')
-        .setLabel('Your Litecoin payout address')
-        .setPlaceholder('ltc1...')
+        .setLabel(`Your ${coin.name} payout address`)
+        .setPlaceholder(coin.key === 'ltc' ? 'ltc1...' : coin.key === 'btc' ? 'bc1...' : coin.key === 'eth' ? '0x...' : 'Solana address')
         .setStyle(TextInputStyle.Short)
         .setRequired(true)
         .setMinLength(14)
@@ -858,6 +901,7 @@ async function handleCryptoButton(interaction, config) {
     });
     const sellerId = userForRole(next, 'seller');
     const buyerId = userForRole(next, 'buyer');
+    const coin = coinDetails(config, next.coinKey);
     await interaction.reply({
       content: `<@${sellerId}> <@${buyerId}>`,
       embeds: [new EmbedBuilder()
@@ -866,10 +910,10 @@ async function handleCryptoButton(interaction, config) {
         .setDescription(
           `Payment has been marked as sent to <@${sellerId}>.\n\n` +
           `**Amount:** $${next.amount} USD\n` +
-          `**Litecoin address:** \`${next.payoutAddress}\`\n\n` +
+          `**${coin.name} address:** \`${next.payoutAddress}\`\n\n` +
           '🔒 This ticket will close in **10 seconds**.'
         )
-        .setFooter({ text: 'Discord status only — no Litecoin transaction was broadcast by this bot.' })
+        .setFooter({ text: `Discord status only — no ${coin.name} transaction was broadcast by this bot.` })
         .setTimestamp()],
     });
     const closeTimer = setTimeout(() => interaction.channel.delete().catch(() => null), 10000);
@@ -879,7 +923,9 @@ async function handleCryptoButton(interaction, config) {
 }
 
 async function handleCryptoModal(interaction, config) {
-  if (interaction.customId === 'crypto_start_modal') {
+  const startMatch = interaction.customId.match(/^crypto_start_modal_(btc|eth|ltc|sol)$/);
+  if (startMatch || interaction.customId === 'crypto_start_modal') {
+    const coinKey = startMatch?.[1] || 'ltc';
     const rawId = interaction.fields.getTextInputValue('counterparty').trim();
     const buyerGives = interaction.fields.getTextInputValue('buyerGives').trim();
     const sellerGives = interaction.fields.getTextInputValue('sellerGives').trim();
@@ -891,7 +937,7 @@ async function handleCryptoModal(interaction, config) {
     if (counterparty.id === interaction.user.id) return interaction.reply({ content: 'Enter the other trader’s ID, not your own.', ephemeral: true });
     if (counterparty.bot) return interaction.reply({ content: 'A bot cannot be the other trader.', ephemeral: true });
     await interaction.deferReply({ ephemeral: true });
-    const channel = await createCryptoTicket(interaction.guild, interaction.user, counterparty, { buyerGives, sellerGives }, config);
+    const channel = await createCryptoTicket(interaction.guild, interaction.user, counterparty, { buyerGives, sellerGives, coinKey }, config);
     return interaction.editReply({ content: `Crypto middleman ticket created: ${channel}` });
   }
 
@@ -962,18 +1008,19 @@ async function handleCryptoModal(interaction, config) {
       return interaction.reply({ content: 'Only the seller can enter a payout address at this stage.', ephemeral: true });
     }
     const payoutAddress = interaction.fields.getTextInputValue('payoutAddress').trim();
-    if (!isValidLitecoinAddress(payoutAddress)) {
-      return interaction.reply({ content: 'That is not a valid Litecoin Bech32 address. Check it carefully and try again.', ephemeral: true });
+    const coin = coinDetails(config, session.coinKey);
+    if (!isValidPayoutAddress(payoutAddress, coin.key)) {
+      return interaction.reply({ content: `That is not a valid ${coin.name} address. Check it carefully and try again.`, ephemeral: true });
     }
     const next = updateSession(interaction.channelId, {
       phase: 'confirming_payout_address',
-      payoutAddress: payoutAddress.toLowerCase(),
+      payoutAddress,
     });
     const sellerId = userForRole(next, 'seller');
     return interaction.reply({
       content: `<@${sellerId}>`,
       embeds: [new EmbedBuilder()
-        .setTitle('⚠️ Confirm Your Litecoin Address')
+        .setTitle(`⚠️ Confirm Your ${coin.name} Address`)
         .setColor('#FEE75C')
         .setDescription(
           `Are you sure this is the correct payout address?\n\n` +
